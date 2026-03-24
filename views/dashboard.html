@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CyberSIEM Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    >
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""
+    ></script>
+</head>
+<body class="bg-[#0f0f0f] text-[#f5f5f5] antialiased">
+    {% set summary = namespace(open=0, investigating=0, resolved=0) %}
+    {% for alert in alerts %}
+        {% if alert.status == "open" %}
+            {% set summary.open = summary.open + 1 %}
+        {% elif alert.status == "investigating" %}
+            {% set summary.investigating = summary.investigating + 1 %}
+        {% elif alert.status == "resolved" %}
+            {% set summary.resolved = summary.resolved + 1 %}
+        {% endif %}
+    {% endfor %}
+
+    <div class="min-h-screen [font-family:'IBM_Plex_Sans','Helvetica_Neue','Noto_Sans',sans-serif]">
+        <header class="border-b border-white/10 bg-[#0f0f0f]">
+            <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+                <div>
+                    <h1 class="text-lg font-semibold tracking-tight">CyberSIEM</h1>
+                    <p class="mt-1 text-sm text-zinc-400">Overview</p>
+                </div>
+                <nav class="flex items-center gap-2 text-sm">
+                    <a
+                        href="/dashboard"
+                        class="rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-zinc-100"
+                    >
+                        Dashboard
+                    </a>
+                    <a
+                        href="/alerts"
+                        class="rounded-md border border-zinc-700 px-3 py-2 text-zinc-300 transition-colors duration-150 hover:bg-zinc-800"
+                    >
+                        Alerts
+                    </a>
+                </nav>
+            </div>
+        </header>
+
+        <main class="mx-auto max-w-7xl px-6 py-6">
+            <section class="rounded-md border border-white/10 bg-[#1a1a1a]">
+                <div class="border-b border-white/10 px-4 py-4">
+                    <h2 class="text-base font-semibold text-zinc-100">Overview</h2>
+                </div>
+                <div class="px-4 py-4">
+                    <div class="rounded-md border border-white/10 bg-[#141414]">
+                        <div class="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
+                            <div>
+                                <h3 class="text-sm font-medium text-zinc-100">Attack map</h3>
+                                <p class="mt-1 text-sm text-zinc-400">Recent geolocated alerts from the latest detections</p>
+                            </div>
+                            <a
+                                href="/alerts"
+                                class="rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-300 transition-colors duration-150 hover:bg-zinc-800"
+                            >
+                                Open alerts
+                            </a>
+                        </div>
+                        <div id="attack-map" class="h-[420px] w-full"></div>
+                        <div id="map-status" class="border-t border-white/10 px-4 py-3 text-sm text-zinc-400">
+                            Loading map data...
+                        </div>
+                    </div>
+                </div>
+                <div class="grid gap-4 px-4 pb-4 md:grid-cols-2">
+                    <div class="rounded-md border border-white/10 bg-[#141414] p-4">
+                        <h3 class="text-sm font-medium text-zinc-100">Recent alert snapshot</h3>
+                        <dl class="mt-3 space-y-2 text-sm">
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Loaded alerts</dt>
+                                <dd class="text-zinc-100">{{ alerts|length }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Open</dt>
+                                <dd class="text-red-300">{{ summary.open }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Investigating</dt>
+                                <dd class="text-amber-300">{{ summary.investigating }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Resolved</dt>
+                                <dd class="text-emerald-300">{{ summary.resolved }}</dd>
+                            </div>
+                        </dl>
+                        <div class="mt-4">
+                            <a
+                                href="/alerts"
+                                class="inline-flex rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-200 transition-colors duration-150 hover:bg-zinc-800"
+                            >
+                                Open alerts page
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const attackMap = L.map("attack-map", {
+            zoomControl: true,
+            attributionControl: true,
+        }).setView([20, 0], 2);
+
+        const markerLayer = L.layerGroup().addTo(attackMap);
+        const mapStatus = document.getElementById("map-status");
+
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+        }).addTo(attackMap);
+
+        function getSeverityColor(severity) {
+            if (severity === "high") {
+                return "#ef4444";
+            }
+            if (severity === "medium") {
+                return "#f59e0b";
+            }
+            return "#22c55e";
+        }
+
+        function setMapStatus(message) {
+            mapStatus.textContent = message;
+        }
+
+        function renderMapPoints(points) {
+            markerLayer.clearLayers();
+
+            if (!points.length) {
+                attackMap.setView([20, 0], 2);
+                setMapStatus("No geolocated alerts available.");
+                return;
+            }
+
+            const bounds = [];
+
+            points.forEach((point) => {
+                const latitude = Number(point.lat);
+                const longitude = Number(point.lon);
+                if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+                    return;
+                }
+
+                const marker = L.circleMarker([latitude, longitude], {
+                    radius: 6,
+                    color: getSeverityColor(point.severity),
+                    fillColor: getSeverityColor(point.severity),
+                    fillOpacity: 0.85,
+                    weight: 1,
+                });
+
+                marker.bindPopup(
+                    `
+                        <div style="min-width: 160px; color: #111827;">
+                            <div style="font-weight: 600;">${point.ip}</div>
+                            <div style="margin-top: 4px;">Type: ${point.type}</div>
+                            <div style="margin-top: 8px;">
+                                <a href="/alerts" style="color: #2563eb; text-decoration: underline;">Open alerts</a>
+                            </div>
+                        </div>
+                    `
+                );
+
+                marker.addTo(markerLayer);
+                bounds.push([latitude, longitude]);
+            });
+
+            if (!bounds.length) {
+                attackMap.setView([20, 0], 2);
+                setMapStatus("Map data loaded but no valid coordinates were available.");
+                return;
+            }
+
+            if (bounds.length === 1) {
+                attackMap.setView(bounds[0], 4);
+            } else {
+                attackMap.fitBounds(bounds, { padding: [30, 30] });
+            }
+
+            setMapStatus(`Showing ${points.length} geolocated alert markers.`);
+        }
+
+        async function loadMapData() {
+            try {
+                const response = await fetch("/map-data");
+                if (!response.ok) {
+                    throw new Error(`Map data request failed with status ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log(data);
+                const points = data.filter((point) => (
+                    point
+                    && Number.isFinite(Number(point.lat))
+                    && Number.isFinite(Number(point.lon))
+                ));
+                renderMapPoints(points);
+            } catch (error) {
+                markerLayer.clearLayers();
+                attackMap.setView([20, 0], 2);
+                setMapStatus("Map data is unavailable.");
+            }
+        }
+
+        loadMapData();
+        window.setInterval(loadMapData, 15000);
+        window.setTimeout(() => attackMap.invalidateSize(), 100);
+    </script>
+</body>
+</html>

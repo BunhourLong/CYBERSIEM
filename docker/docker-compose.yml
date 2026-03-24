@@ -1,17 +1,64 @@
-version: "3.9"
-
 services:
-  mongodb:
-    image: mongo:latest
-    container_name: sentinel_mongo
+  postgres:
+    image: postgres:16
+    container_name: cybersiem_postgres
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "5432:5432"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: sentinel
-      MONGO_INITDB_ROOT_PASSWORD: sentinelpass
+      POSTGRES_DB: cybersiem
+      POSTGRES_USER: cybersiem
+      POSTGRES_PASSWORD: cybersiem
     volumes:
-      - mongo_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cybersiem_nginx
+    ports:
+      - "8088:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+    command:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /var/log/nginx
+        rm -f /var/log/nginx/access.log /var/log/nginx/error.log
+        touch /var/log/nginx/access.log /var/log/nginx/error.log
+        exec nginx -g 'daemon off;'
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    container_name: cybersiem_api
+    environment:
+      DATABASE_URL: postgresql://cybersiem:cybersiem@postgres:5432/cybersiem
+      GEOIP_DB_PATH: /data/GeoLite2-City.mmdb
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../geo:/data:ro
+    depends_on:
+      - postgres
+
+  security_engine:
+    build:
+      context: ..
+      dockerfile: docker/security_engine.Dockerfile
+    container_name: cybersiem_security_engine
+    environment:
+      DATABASE_URL: postgresql://cybersiem:cybersiem@postgres:5432/cybersiem
+      NGINX_ACCESS_LOG: /var/log/nginx/access.log
+    volumes:
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - postgres
+      - nginx
 
 volumes:
-  mongo_data:
+  postgres_data:
+  nginx_logs:

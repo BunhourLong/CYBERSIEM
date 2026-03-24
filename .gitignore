@@ -20,12 +20,6 @@ mongo_data/
 *.db
 
 # =========================
-# GeoIP Database
-# =========================
-geo/GeoLite2-City.mmdb
-geo/*.mmdb
-
-# =========================
 # Streamlit
 # =========================
 .streamlit/
@@ -46,6 +40,11 @@ Thumbs.db
 # Docker
 # =========================
 docker/*.log
+
+# =========================
+# Local QA Tests
+# =========================
+tests/qa/
 
 # =========================
 # Nmap Scan Outputs (if added later)

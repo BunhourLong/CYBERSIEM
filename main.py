@@ -11,8 +11,7 @@ def handle_packet(packet):
         return
 
     event = classify_event(event)
-    event = enrich_geo(event)   # 🔥 THIS WAS MISSING
-
+    event = enrich_geo(event)  
     save_event(event)
 
     print(

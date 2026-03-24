@@ -1,0 +1,152 @@
+<section
+    id="alerts-table"
+    class="overflow-x-auto"
+    hx-get="/alerts/partial?limit={{ limit }}"
+    hx-trigger="every 5s"
+    hx-swap="outerHTML"
+>
+    <table class="min-w-full divide-y divide-white/10 text-sm">
+        <thead class="bg-[#161616] text-left text-zinc-400">
+            <tr>
+                <th scope="col" class="px-4 py-3 font-medium">ID</th>
+                <th scope="col" class="px-4 py-3 font-medium">Created</th>
+                <th scope="col" class="px-4 py-3 font-medium">IP</th>
+                <th scope="col" class="px-4 py-3 font-medium">Endpoint</th>
+                <th scope="col" class="px-4 py-3 font-medium">Type</th>
+                <th scope="col" class="px-4 py-3 font-medium">Severity</th>
+                <th scope="col" class="px-4 py-3 font-medium">Status</th>
+                <th scope="col" class="px-4 py-3 font-medium">Message</th>
+                <th scope="col" class="px-4 py-3 font-medium">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-white/10">
+            {% for alert in alerts %}
+            {% set attack_description = "Suspicious activity detected." %}
+            {% if alert.type == "payload_sqli" %}
+                {% set attack_description = "Possible SQL Injection attempt using malicious query manipulation." %}
+            {% elif alert.type == "brute_force" %}
+                {% set attack_description = "Multiple failed login attempts detected indicating credential attack." %}
+            {% elif alert.type == "rate_abuse" %}
+                {% set attack_description = "High frequency requests detected indicating possible abuse or scanning." %}
+            {% endif %}
+
+            {% set observed_payload = alert.metadata.get("payload") %}
+            {% if not observed_payload %}
+                {% set observed_payload = alert.metadata.get("query") %}
+            {% endif %}
+            {% if not observed_payload %}
+                {% set observed_payload = alert.metadata.get("request_target") %}
+            {% endif %}
+            {% if not observed_payload and alert.metadata.get("matched_patterns") %}
+                {% set observed_payload = alert.metadata.get("matched_patterns") | join(", ") %}
+            {% endif %}
+
+            <tr
+                id="alert-row-{{ alert.id }}"
+                data-alert-id="{{ alert.id }}"
+                class="cursor-pointer align-top text-zinc-200 transition-colors duration-150 hover:bg-white/5"
+                onclick="toggleDetails('{{ alert.id }}', event)"
+                aria-expanded="false"
+            >
+                <td class="whitespace-nowrap px-4 py-3 font-medium text-zinc-100">
+                    <span id="alert-indicator-{{ alert.id }}" class="mr-2 inline-block w-4 text-zinc-500">+</span>{{ alert.id }}
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-zinc-400">{{ alert.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-zinc-300">{{ alert.ip }}</td>
+                <td class="px-4 py-3 font-mono text-xs text-zinc-300">{{ alert.endpoint }}</td>
+                <td class="px-4 py-3 text-zinc-300">{{ alert.type }}</td>
+                <td class="px-4 py-3">
+                    {% if alert.severity == "high" %}
+                    <span class="text-red-300">{{ alert.severity }}</span>
+                    {% elif alert.severity == "medium" %}
+                    <span class="text-amber-300">{{ alert.severity }}</span>
+                    {% else %}
+                    <span class="text-zinc-200">{{ alert.severity }}</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    {% if alert.status == "open" %}
+                    <span class="text-red-300">{{ alert.status }}</span>
+                    {% elif alert.status == "investigating" %}
+                    <span class="text-amber-300">{{ alert.status }}</span>
+                    {% else %}
+                    <span class="text-emerald-300">{{ alert.status }}</span>
+                    {% endif %}
+                </td>
+                <td class="max-w-md px-4 py-3 text-zinc-300">{{ alert.message }}</td>
+                <td class="px-4 py-3" onclick="event.stopPropagation()">
+                    <form
+                        class="flex flex-wrap gap-2"
+                        hx-post="/alerts/{{ alert.id }}/status?limit={{ limit }}"
+                        hx-target="#alerts-table"
+                        hx-swap="outerHTML"
+                        onclick="event.stopPropagation()"
+                    >
+                        <button
+                            type="submit"
+                            name="status"
+                            value="open"
+                            class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-150 {% if alert.status == 'open' %}border-red-500 bg-red-500 text-[#0f0f0f]{% else %}border-zinc-700 text-zinc-200 hover:bg-zinc-800{% endif %}"
+                            {% if alert.status == "open" %}disabled{% endif %}
+                        >
+                            Open
+                        </button>
+                        <button
+                            type="submit"
+                            name="status"
+                            value="investigating"
+                            class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-150 {% if alert.status == 'investigating' %}border-amber-400 bg-amber-400 text-[#0f0f0f]{% else %}border-zinc-700 text-zinc-200 hover:bg-zinc-800{% endif %}"
+                            {% if alert.status == "investigating" %}disabled{% endif %}
+                        >
+                            Investigating
+                        </button>
+                        <button
+                            type="submit"
+                            name="status"
+                            value="resolved"
+                            class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-150 {% if alert.status == 'resolved' %}border-emerald-400 bg-emerald-400 text-[#0f0f0f]{% else %}border-zinc-700 text-zinc-200 hover:bg-zinc-800{% endif %}"
+                            {% if alert.status == "resolved" %}disabled{% endif %}
+                        >
+                            Resolved
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            <tr id="alert-details-{{ alert.id }}" class="hidden bg-[#141414] text-zinc-300">
+                <td colspan="9" class="px-4 py-4">
+                    <div class="grid gap-4 md:grid-cols-3">
+                        <div>
+                            <p class="text-xs text-zinc-500">Source IP</p>
+                            <p class="mt-1 font-mono text-sm text-zinc-200">{{ alert.ip }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">Endpoint</p>
+                            <p class="mt-1 font-mono text-sm text-zinc-200">{{ alert.endpoint }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">Attack type</p>
+                            <p class="mt-1 text-sm text-zinc-200">{{ alert.type }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 border-t border-white/10 pt-4">
+                        <p class="text-xs text-zinc-500">Description</p>
+                        <p class="mt-1 text-sm text-zinc-200">{{ attack_description }}</p>
+                    </div>
+
+                    {% if observed_payload %}
+                    <div class="mt-4 border-t border-white/10 pt-4">
+                        <p class="text-xs text-zinc-500">Observed payload</p>
+                        <pre class="mt-1 whitespace-pre-wrap break-all font-mono text-xs text-zinc-300">{{ observed_payload }}</pre>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="9" class="px-4 py-8 text-center text-zinc-500">No alerts found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>

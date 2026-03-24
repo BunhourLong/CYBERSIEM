@@ -3,7 +3,7 @@ from scapy.layers.inet import IP, TCP, UDP
 from src.core.schemas import NetworkEvent
 
 
-def packet_to_event(packet):
+def packet_to_event(packet) -> NetworkEvent | None:
     if IP not in packet:
         return None
 

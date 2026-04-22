@@ -15,6 +15,7 @@ class LogMonitorService:
 
     def __init__(self, engine: SecurityEngine | None = None) -> None:
         self.engine = engine or SecurityEngine()
+        self.engine.enforcement_service.initialize()
         self._last_idle_log_at = 0.0
 
     def process_line(self, line: str):
@@ -49,7 +50,12 @@ class LogMonitorService:
                                 continue
 
                             self._log(
-                                f"Parsed event: ip={event.ip} endpoint={event.endpoint}"
+                                "Parsed event: "
+                                f"ip={event.ip} source={event.ip_source} "
+                                f"peer_ip={event.peer_ip} "
+                                f"x_forwarded_for={event.x_forwarded_for} "
+                                f"x_real_ip={event.x_real_ip} "
+                                f"endpoint={event.endpoint}"
                             )
 
                             for alert in alerts:

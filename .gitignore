@@ -52,3 +52,7 @@ tests/qa/
 *.xml
 *.gnmap
 *.nmap
+.wolf/
+.claude/*
+!.claude/rules/
+!.claude/rules/openwolf.md

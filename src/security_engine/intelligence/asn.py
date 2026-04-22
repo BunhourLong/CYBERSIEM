@@ -12,11 +12,12 @@ from geoip2.errors import AddressNotFoundError
 
 DEFAULT_ASN_DB_PATH: Final[str] = os.getenv(
     "GEOIP_ASN_DB_PATH",
-    "/data/GeoLite2-ASN.mmdb",
+    "data/GeoLite2-ASN.mmdb",
 )
 
 KNOWN_DATACENTER_KEYWORDS: Final[dict[str, tuple[str, ...]]] = {
     "aws": ("amazon", "aws"),
+    "cloudflare": ("cloudflare",),
     "google_cloud": ("google", "google cloud"),
     "azure": ("microsoft", "azure"),
     "digitalocean": ("digitalocean",),

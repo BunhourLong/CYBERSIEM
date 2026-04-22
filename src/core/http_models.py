@@ -17,6 +17,11 @@ class HTTPLogEvent:
     raw_line: str
     query: str = ""
     referer: str = "-"
+    ip_source: str = "remote_addr"
+    peer_ip: str = "-"
+    x_forwarded_for: str = "-"
+    x_real_ip: str = "-"
+    cf_connecting_ip: str = "-"
 
 
 @dataclass(slots=True)
@@ -27,6 +32,8 @@ class DetectionAlert:
     severity: str
     timestamp: datetime
     message: str
+    status: str = "unresolved"
     event_id: int | None = None
+    id: int | None = None
+    confidence: int = 50
     metadata: dict[str, Any] = field(default_factory=dict)
-

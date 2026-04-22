@@ -1,19 +1,125 @@
 <section
     id="alerts-table"
     class="overflow-x-auto"
-    hx-get="/alerts/partial?limit={{ limit }}"
+    hx-get="/alerts/partial?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
     hx-trigger="every 5s"
     hx-swap="outerHTML"
 >
+    <!-- Filter bar -->
+    <form
+        id="alerts-filter-form"
+        class="flex flex-wrap items-end gap-3 border-b border-white/10 bg-[#161616] px-4 py-3"
+        hx-get="/alerts/partial"
+        hx-target="#alerts-table"
+        hx-swap="outerHTML"
+        hx-trigger="submit, change delay:400ms"
+    >
+        <input type="hidden" name="limit" value="{{ limit }}">
+
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-zinc-500">Type</label>
+            <select
+                name="type"
+                class="rounded-md border border-zinc-700 bg-[#0f0f0f] px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-600"
+            >
+                <option value="" {% if not filter_type %}selected{% endif %}>All types</option>
+                {% for t in alert_types %}
+                <option value="{{ t }}" {% if filter_type == t %}selected{% endif %}>{{ t.replace("_", " ") }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-zinc-500">Severity</label>
+            <select
+                name="severity"
+                class="rounded-md border border-zinc-700 bg-[#0f0f0f] px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-600"
+            >
+                <option value="" {% if not filter_severity %}selected{% endif %}>All severities</option>
+                <option value="high" {% if filter_severity == "high" %}selected{% endif %}>High</option>
+                <option value="medium" {% if filter_severity == "medium" %}selected{% endif %}>Medium</option>
+                <option value="low" {% if filter_severity == "low" %}selected{% endif %}>Low</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-zinc-500">Status</label>
+            <select
+                name="status"
+                class="rounded-md border border-zinc-700 bg-[#0f0f0f] px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-600"
+            >
+                <option value="" {% if not filter_status %}selected{% endif %}>All statuses</option>
+                <option value="unresolved" {% if filter_status == "unresolved" %}selected{% endif %}>Unresolved</option>
+                <option value="malicious" {% if filter_status == "malicious" %}selected{% endif %}>Malicious</option>
+                <option value="safe" {% if filter_status == "safe" %}selected{% endif %}>Safe</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-zinc-500">IP</label>
+            <input
+                type="text"
+                name="ip"
+                value="{{ filter_ip }}"
+                placeholder="Filter by IP…"
+                class="rounded-md border border-zinc-700 bg-[#0f0f0f] px-2 py-1.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 w-36"
+                hx-trigger="keyup changed delay:600ms, change"
+                hx-get="/alerts/partial"
+                hx-target="#alerts-table"
+                hx-swap="outerHTML"
+                hx-include="#alerts-filter-form"
+            >
+        </div>
+
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-zinc-500">Blocked only</label>
+            <label class="flex items-center gap-2 cursor-pointer py-1.5">
+                <input
+                    type="checkbox"
+                    name="blocked_only"
+                    value="true"
+                    {% if blocked_only %}checked{% endif %}
+                    class="rounded border-zinc-600 bg-zinc-800 text-red-500 focus:ring-zinc-600"
+                >
+                <span class="text-sm text-zinc-300">Blocked</span>
+            </label>
+        </div>
+
+        {% if filter_type or filter_severity or filter_status or filter_ip or blocked_only %}
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-zinc-500 invisible">Reset</label>
+            <a
+                href="/alerts"
+                class="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors duration-150"
+            >
+                Clear filters
+            </a>
+        </div>
+        {% endif %}
+
+        <div class="ml-auto flex flex-col gap-1">
+            <label class="text-xs text-zinc-500 invisible">Count</label>
+            <span class="text-sm text-zinc-500 py-1.5">
+                {{ alerts | length }} result(s)
+                {% if filter_type or filter_severity or filter_status or filter_ip or blocked_only %}
+                <span class="text-zinc-600">— filtered</span>
+                {% endif %}
+            </span>
+        </div>
+    </form>
+
     <table class="min-w-full divide-y divide-white/10 text-sm">
         <thead class="bg-[#161616] text-left text-zinc-400">
             <tr>
                 <th scope="col" class="px-4 py-3 font-medium">ID</th>
                 <th scope="col" class="px-4 py-3 font-medium">Created</th>
                 <th scope="col" class="px-4 py-3 font-medium">IP</th>
+                <th scope="col" class="px-4 py-3 font-medium">State</th>
+                <th scope="col" class="px-4 py-3 font-medium">Score</th>
                 <th scope="col" class="px-4 py-3 font-medium">Endpoint</th>
                 <th scope="col" class="px-4 py-3 font-medium">Type</th>
                 <th scope="col" class="px-4 py-3 font-medium">Severity</th>
+                <th scope="col" class="px-4 py-3 font-medium">Conf.</th>
                 <th scope="col" class="px-4 py-3 font-medium">Status</th>
                 <th scope="col" class="px-4 py-3 font-medium">Message</th>
                 <th scope="col" class="px-4 py-3 font-medium">Actions</th>
@@ -24,10 +130,22 @@
             {% set attack_description = "Suspicious activity detected." %}
             {% if alert.type == "payload_sqli" %}
                 {% set attack_description = "Possible SQL Injection attempt using malicious query manipulation." %}
+            {% elif alert.type == "xss_payload" %}
+                {% set attack_description = "Cross-site scripting payload detected in request." %}
             {% elif alert.type == "brute_force" %}
-                {% set attack_description = "Multiple failed login attempts detected indicating credential attack." %}
+                {% set attack_description = "Multiple failed login attempts indicating a credential attack." %}
+            {% elif alert.type == "credential_stuffing" %}
+                {% set attack_description = "Automated credential list attack across multiple endpoints or user agents." %}
             {% elif alert.type == "rate_abuse" %}
-                {% set attack_description = "High frequency requests detected indicating possible abuse or scanning." %}
+                {% set attack_description = "High-frequency requests indicating abuse or scanning." %}
+            {% elif alert.type == "scraping" %}
+                {% set attack_description = "Systematic crawling of many unique endpoints (scraping/enumeration)." %}
+            {% elif alert.type == "path_probe" %}
+                {% set attack_description = "Broad endpoint enumeration suggesting directory or path probing." %}
+            {% elif alert.type == "404_spray" %}
+                {% set attack_description = "High volume of 404 responses suggesting automated resource discovery." %}
+            {% elif alert.type == "user_agent_rotation" %}
+                {% set attack_description = "Multiple distinct user agents from the same IP indicating evasion." %}
             {% endif %}
 
             {% set observed_payload = alert.metadata.get("payload") %}
@@ -39,6 +157,9 @@
             {% endif %}
             {% if not observed_payload and alert.metadata.get("matched_patterns") %}
                 {% set observed_payload = alert.metadata.get("matched_patterns") | join(", ") %}
+            {% endif %}
+            {% if not observed_payload and alert.metadata.get("sample_uas") %}
+                {% set observed_payload = "UAs: " + (alert.metadata.get("sample_uas") | join(", ")) %}
             {% endif %}
 
             <tr
@@ -53,6 +174,20 @@
                 </td>
                 <td class="whitespace-nowrap px-4 py-3 text-zinc-400">{{ alert.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
                 <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-zinc-300">{{ alert.ip }}</td>
+                <td class="px-4 py-3">
+                    {% if alert.current_state == "blocked" %}
+                    <span class="text-red-300">{{ alert.current_state }}</span>
+                    {% elif alert.current_state == "throttled" %}
+                    <span class="text-orange-300">{{ alert.current_state }}</span>
+                    {% elif alert.current_state == "suspicious" %}
+                    <span class="text-amber-300">{{ alert.current_state }}</span>
+                    {% elif alert.current_state == "unknown" %}
+                    <span class="text-zinc-200">{{ alert.current_state }}</span>
+                    {% else %}
+                    <span class="text-emerald-300">{{ alert.current_state or "trusted" }}</span>
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-zinc-200">{{ "%.2f"|format(alert.current_score) }}</td>
                 <td class="px-4 py-3 font-mono text-xs text-zinc-300">{{ alert.endpoint }}</td>
                 <td class="px-4 py-3 text-zinc-300">{{ alert.type }}</td>
                 <td class="px-4 py-3">
@@ -64,10 +199,15 @@
                     <span class="text-zinc-200">{{ alert.severity }}</span>
                     {% endif %}
                 </td>
+                <td class="whitespace-nowrap px-4 py-3">
+                    <span class="text-xs {% if alert.confidence >= 80 %}text-red-300{% elif alert.confidence >= 60 %}text-amber-300{% else %}text-zinc-400{% endif %}">
+                        {{ alert.confidence }}%
+                    </span>
+                </td>
                 <td class="px-4 py-3">
-                    {% if alert.status == "open" %}
+                    {% if alert.status == "malicious" %}
                     <span class="text-red-300">{{ alert.status }}</span>
-                    {% elif alert.status == "investigating" %}
+                    {% elif alert.status == "unresolved" %}
                     <span class="text-amber-300">{{ alert.status }}</span>
                     {% else %}
                     <span class="text-emerald-300">{{ alert.status }}</span>
@@ -77,7 +217,7 @@
                 <td class="px-4 py-3" onclick="event.stopPropagation()">
                     <form
                         class="flex flex-wrap gap-2"
-                        hx-post="/alerts/{{ alert.id }}/status?limit={{ limit }}"
+                        hx-post="/alerts/{{ alert.id }}/status?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
                         hx-target="#alerts-table"
                         hx-swap="outerHTML"
                         onclick="event.stopPropagation()"
@@ -85,39 +225,152 @@
                         <button
                             type="submit"
                             name="status"
-                            value="open"
-                            class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-150 {% if alert.status == 'open' %}border-red-500 bg-red-500 text-[#0f0f0f]{% else %}border-zinc-700 text-zinc-200 hover:bg-zinc-800{% endif %}"
-                            {% if alert.status == "open" %}disabled{% endif %}
+                            value="unresolved"
+                            class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-150 {% if alert.status == 'unresolved' %}border-amber-400 bg-amber-400 text-[#0f0f0f]{% else %}border-zinc-700 text-zinc-200 hover:bg-zinc-800{% endif %}"
+                            {% if alert.status == "unresolved" %}disabled{% endif %}
                         >
-                            Open
+                            Unresolved
                         </button>
                         <button
                             type="submit"
                             name="status"
-                            value="investigating"
-                            class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-150 {% if alert.status == 'investigating' %}border-amber-400 bg-amber-400 text-[#0f0f0f]{% else %}border-zinc-700 text-zinc-200 hover:bg-zinc-800{% endif %}"
-                            {% if alert.status == "investigating" %}disabled{% endif %}
+                            value="safe"
+                            class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-150 {% if alert.status == 'safe' %}border-emerald-400 bg-emerald-400 text-[#0f0f0f]{% else %}border-zinc-700 text-zinc-200 hover:bg-zinc-800{% endif %}"
+                            {% if alert.status == "safe" %}disabled{% endif %}
                         >
-                            Investigating
+                            Safe
                         </button>
                         <button
                             type="submit"
                             name="status"
-                            value="resolved"
-                            class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-150 {% if alert.status == 'resolved' %}border-emerald-400 bg-emerald-400 text-[#0f0f0f]{% else %}border-zinc-700 text-zinc-200 hover:bg-zinc-800{% endif %}"
-                            {% if alert.status == "resolved" %}disabled{% endif %}
+                            value="malicious"
+                            class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-150 {% if alert.status == 'malicious' %}border-red-500 bg-red-500 text-[#0f0f0f]{% else %}border-zinc-700 text-zinc-200 hover:bg-zinc-800{% endif %}"
+                            {% if alert.status == "malicious" %}disabled{% endif %}
                         >
-                            Resolved
+                            Malicious
                         </button>
                     </form>
+                    {% if alert.manual_blocked or alert.current_state == "blocked" %}
+                    <button
+                        type="button"
+                        hx-delete="/blocked-ips/{{ alert.ip }}?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip_filter={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
+                        hx-target="#alerts-table"
+                        hx-swap="outerHTML"
+                        onclick="event.stopPropagation()"
+                        class="mt-2 rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors duration-150 hover:bg-zinc-800"
+                    >
+                        Release block
+                    </button>
+                    {% else %}
+                    <form
+                        class="mt-2"
+                        hx-post="/blocked-ips?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip_filter={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
+                        hx-target="#alerts-table"
+                        hx-swap="outerHTML"
+                        onclick="event.stopPropagation()"
+                    >
+                        <input type="hidden" name="ip" value="{{ alert.ip }}">
+                        <input type="hidden" name="endpoint" value="{{ alert.endpoint }}">
+                        <input type="hidden" name="reason" value="Manual block requested by analyst">
+                        <button
+                            type="submit"
+                            class="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors duration-150 hover:bg-zinc-800"
+                        >
+                            Manual block IP
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if alert.whitelist or alert.analyst_override == "trusted" %}
+                    <form
+                        class="mt-2"
+                        hx-post="/ip-controls?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip_filter={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
+                        hx-target="#alerts-table"
+                        hx-swap="outerHTML"
+                        onclick="event.stopPropagation()"
+                    >
+                        <input type="hidden" name="ip" value="{{ alert.ip }}">
+                        <input type="hidden" name="action" value="clear_trust">
+                        <button
+                            type="submit"
+                            class="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors duration-150 hover:bg-zinc-800"
+                        >
+                            Remove trust
+                        </button>
+                    </form>
+                    {% else %}
+                    <form
+                        class="mt-2"
+                        hx-post="/ip-controls?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip_filter={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
+                        hx-target="#alerts-table"
+                        hx-swap="outerHTML"
+                        onclick="event.stopPropagation()"
+                    >
+                        <input type="hidden" name="ip" value="{{ alert.ip }}">
+                        <input type="hidden" name="action" value="trust">
+                        <button
+                            type="submit"
+                            class="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors duration-150 hover:bg-zinc-800"
+                        >
+                            Trust IP
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if alert.analyst_override == "suppress_auto_block" and alert.cooldown_countdown_seconds and alert.cooldown_countdown_seconds > 0 %}
+                    <form
+                        class="mt-2"
+                        hx-post="/ip-controls?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip_filter={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
+                        hx-target="#alerts-table"
+                        hx-swap="outerHTML"
+                        onclick="event.stopPropagation()"
+                    >
+                        <input type="hidden" name="ip" value="{{ alert.ip }}">
+                        <input type="hidden" name="action" value="clear_override">
+                        <button
+                            type="submit"
+                            class="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors duration-150 hover:bg-zinc-800"
+                        >
+                            End suppression
+                        </button>
+                    </form>
+                    {% else %}
+                    <form
+                        class="mt-2"
+                        hx-post="/ip-controls?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip_filter={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
+                        hx-target="#alerts-table"
+                        hx-swap="outerHTML"
+                        onclick="event.stopPropagation()"
+                    >
+                        <input type="hidden" name="ip" value="{{ alert.ip }}">
+                        <input type="hidden" name="action" value="suppress_auto_block">
+                        <input type="hidden" name="duration_seconds" value="3600">
+                        <button
+                            type="submit"
+                            class="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors duration-150 hover:bg-zinc-800"
+                        >
+                            Suppress 1h
+                        </button>
+                    </form>
+                    {% endif %}
                 </td>
             </tr>
             <tr id="alert-details-{{ alert.id }}" class="hidden bg-[#141414] text-zinc-300">
-                <td colspan="9" class="px-4 py-4">
+                <td colspan="12" class="px-4 py-4">
                     <div class="grid gap-4 md:grid-cols-3">
                         <div>
                             <p class="text-xs text-zinc-500">Source IP</p>
                             <p class="mt-1 font-mono text-sm text-zinc-200">{{ alert.ip }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">Approximate location</p>
+                            {% if alert.country or alert.city or alert.subdivision %}
+                            <p class="mt-1 text-sm text-zinc-200">
+                                {{ [alert.city, alert.subdivision, alert.country] | select | join(", ") }}
+                            </p>
+                            {% elif alert.ip_scope and alert.ip_scope != "public" %}
+                            <p class="mt-1 text-sm text-zinc-400">Unavailable for {{ alert.ip_scope }} IPs</p>
+                            {% else %}
+                            <p class="mt-1 text-sm text-zinc-400">Unavailable</p>
+                            {% endif %}
                         </div>
                         <div>
                             <p class="text-xs text-zinc-500">Endpoint</p>
@@ -126,6 +379,57 @@
                         <div>
                             <p class="text-xs text-zinc-500">Attack type</p>
                             <p class="mt-1 text-sm text-zinc-200">{{ alert.type }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">Confidence</p>
+                            <p class="mt-1 text-sm {% if alert.confidence >= 80 %}text-red-300{% elif alert.confidence >= 60 %}text-amber-300{% else %}text-zinc-200{% endif %}">
+                                {{ alert.confidence }}% — {% if alert.confidence >= 80 %}high{% elif alert.confidence >= 60 %}medium{% else %}low{% endif %}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">IP enforcement</p>
+                            <p class="mt-1 text-sm text-zinc-200">
+                                {{ alert.current_state or alert.reputation_status or "trusted" }}
+                                {% if alert.blocked_reason %}
+                                ({{ alert.blocked_reason.replace("_", " ") }})
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">Current score</p>
+                            <p class="mt-1 text-sm text-zinc-200">{{ "%.2f"|format(alert.current_score) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">GeoIP accuracy</p>
+                            {% if alert.accuracy_radius_km %}
+                            <p class="mt-1 text-sm text-zinc-200">{{ alert.accuracy_radius_km }} km radius</p>
+                            {% elif alert.ip_scope and alert.ip_scope != "public" %}
+                            <p class="mt-1 text-sm text-zinc-400">Skipped for {{ alert.ip_scope }} IP</p>
+                            {% else %}
+                            <p class="mt-1 text-sm text-zinc-400">Unknown</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">Enforcement windows</p>
+                            <p class="mt-1 text-sm text-zinc-200">
+                                {% if alert.block_countdown_seconds and alert.block_countdown_seconds > 0 %}
+                                blocked {{ alert.block_countdown_seconds }}s
+                                {% elif alert.cooldown_countdown_seconds and alert.cooldown_countdown_seconds > 0 %}
+                                cooldown {{ alert.cooldown_countdown_seconds }}s
+                                {% else %}
+                                no active timer
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">Analyst controls</p>
+                            <p class="mt-1 text-sm text-zinc-200">
+                                {% if alert.whitelist %}whitelisted{% elif alert.analyst_override %}{{ alert.analyst_override }}{% else %}none{% endif %}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">Block count / streak</p>
+                            <p class="mt-1 text-sm text-zinc-200">{{ alert.block_count }} blocks, {{ alert.offense_streak }} streak</p>
                         </div>
                     </div>
 
@@ -136,15 +440,40 @@
 
                     {% if observed_payload %}
                     <div class="mt-4 border-t border-white/10 pt-4">
-                        <p class="text-xs text-zinc-500">Observed payload</p>
+                        <p class="text-xs text-zinc-500">Observed payload / evidence</p>
                         <pre class="mt-1 whitespace-pre-wrap break-all font-mono text-xs text-zinc-300">{{ observed_payload }}</pre>
                     </div>
                     {% endif %}
+
+                    {% if alert.metadata %}
+                    <div class="mt-4 border-t border-white/10 pt-4">
+                        <p class="text-xs text-zinc-500">Detection metadata</p>
+                        <dl class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-3">
+                            {% for k, v in alert.metadata.items() %}
+                            {% if k not in ("payload", "query", "request_target", "matched_patterns", "sample_uas") %}
+                            <div class="flex items-baseline gap-2">
+                                <dt class="text-zinc-500 shrink-0">{{ k.replace("_", " ") }}</dt>
+                                <dd class="text-zinc-300 truncate">{{ v }}</dd>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </dl>
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-4 border-t border-white/10 pt-4">
+                        <p class="text-xs text-zinc-500">Reputation reasons</p>
+                        {% if alert.reputation_reasons %}
+                        <p class="mt-1 text-sm text-zinc-200">{{ alert.reputation_reasons | join(", ") }}</p>
+                        {% else %}
+                        <p class="mt-1 text-sm text-zinc-400">No active reputation reasons.</p>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="9" class="px-4 py-8 text-center text-zinc-500">No alerts found.</td>
+                <td colspan="12" class="px-4 py-8 text-center text-zinc-500">No alerts found.</td>
             </tr>
             {% endfor %}
         </tbody>

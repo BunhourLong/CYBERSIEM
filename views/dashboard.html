@@ -19,14 +19,14 @@
     ></script>
 </head>
 <body class="bg-[#0f0f0f] text-[#f5f5f5] antialiased">
-    {% set summary = namespace(open=0, investigating=0, resolved=0) %}
+    {% set summary = namespace(unresolved=0, safe=0, malicious=0) %}
     {% for alert in alerts %}
-        {% if alert.status == "open" %}
-            {% set summary.open = summary.open + 1 %}
-        {% elif alert.status == "investigating" %}
-            {% set summary.investigating = summary.investigating + 1 %}
-        {% elif alert.status == "resolved" %}
-            {% set summary.resolved = summary.resolved + 1 %}
+        {% if alert.status == "unresolved" %}
+            {% set summary.unresolved = summary.unresolved + 1 %}
+        {% elif alert.status == "safe" %}
+            {% set summary.safe = summary.safe + 1 %}
+        {% elif alert.status == "malicious" %}
+            {% set summary.malicious = summary.malicious + 1 %}
         {% endif %}
     {% endfor %}
 
@@ -50,11 +50,164 @@
                     >
                         Alerts
                     </a>
+                    <div class="flex items-center gap-2 pl-2 border-l border-zinc-700/60">
+                        <span class="font-mono text-xs text-zinc-400">{{ current_user.username }}</span>
+                        <span class="rounded px-1.5 py-0.5 text-xs font-medium
+                            {% if current_user.role == 'admin' %}bg-red-900/40 text-red-400
+                            {% elif current_user.role == 'analyst' %}bg-blue-900/40 text-blue-400
+                            {% else %}bg-zinc-800 text-zinc-500{% endif %}">
+                            {{ current_user.role }}
+                        </span>
+                        <form method="post" action="/logout">
+                            <button type="submit" class="rounded-md border border-zinc-700 px-3 py-2 text-zinc-400 transition-colors duration-150 hover:bg-zinc-800 hover:text-zinc-200">
+                                Sign out
+                            </button>
+                        </form>
+                    </div>
                 </nav>
             </div>
         </header>
 
-        <main class="mx-auto max-w-7xl px-6 py-6">
+        <main class="mx-auto max-w-7xl px-6 py-6 space-y-4">
+
+            <!-- Analytics row: top categories, severity, top IPs, alerts over time -->
+            <section class="rounded-md border border-white/10 bg-[#1a1a1a]">
+                <div class="border-b border-white/10 px-4 py-3 flex items-center justify-between gap-4">
+                    <h2 class="text-base font-semibold text-zinc-100">Analytics <span class="text-sm font-normal text-zinc-500">— last 24 h</span></h2>
+                </div>
+                <div class="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
+
+                    <!-- Top attack categories -->
+                    <div class="rounded-md border border-white/10 bg-[#141414] p-4">
+                        <h3 class="text-sm font-medium text-zinc-100">Top attack categories</h3>
+                        {% set max_type_count = namespace(val=1) %}
+                        {% for row in alert_type_counts %}
+                            {% if row.count > max_type_count.val %}{% set max_type_count.val = row.count %}{% endif %}
+                        {% endfor %}
+                        <ul class="mt-3 space-y-2 text-sm">
+                            {% for row in alert_type_counts[:6] %}
+                            <li>
+                                <div class="flex items-center justify-between gap-2 mb-1">
+                                    <span class="text-zinc-300 truncate max-w-[140px]" title="{{ row.type }}">{{ row.type.replace("_", " ") }}</span>
+                                    <span class="shrink-0 text-zinc-400">{{ row.count }}</span>
+                                </div>
+                                <div class="h-1.5 rounded-full bg-zinc-800">
+                                    <div
+                                        class="h-1.5 rounded-full bg-amber-400"
+                                        style="width: {{ (row.count / max_type_count.val * 100) | round | int }}%"
+                                    ></div>
+                                </div>
+                            </li>
+                            {% else %}
+                            <li class="text-zinc-500 py-2">No alerts in last 24h.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <!-- Severity distribution -->
+                    <div class="rounded-md border border-white/10 bg-[#141414] p-4">
+                        <h3 class="text-sm font-medium text-zinc-100">Severity distribution</h3>
+                        {% set total_sev = namespace(val=0) %}
+                        {% for row in severity_counts %}{% set total_sev.val = total_sev.val + row.count %}{% endfor %}
+                        <ul class="mt-3 space-y-3 text-sm">
+                            {% for row in severity_counts %}
+                            {% set sev_pct = (row.count / [total_sev.val, 1] | max * 100) | round | int %}
+                            <li>
+                                <div class="flex items-center justify-between gap-2 mb-1">
+                                    <span class="{% if row.severity == 'high' %}text-red-300{% elif row.severity == 'medium' %}text-amber-300{% else %}text-zinc-300{% endif %}">
+                                        {{ row.severity }}
+                                    </span>
+                                    <span class="text-zinc-400">{{ row.count }} <span class="text-zinc-600">({{ sev_pct }}%)</span></span>
+                                </div>
+                                <div class="h-1.5 rounded-full bg-zinc-800">
+                                    <div
+                                        class="h-1.5 rounded-full {% if row.severity == 'high' %}bg-red-500{% elif row.severity == 'medium' %}bg-amber-400{% else %}bg-emerald-500{% endif %}"
+                                        style="width: {{ sev_pct }}%"
+                                    ></div>
+                                </div>
+                            </li>
+                            {% else %}
+                            <li class="text-zinc-500 py-2">No alerts in last 24h.</li>
+                            {% endfor %}
+                        </ul>
+                        {% if total_sev.val > 0 %}
+                        <p class="mt-3 text-xs text-zinc-500">{{ total_sev.val }} total alerts</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Top IPs by alert count -->
+                    <div class="rounded-md border border-white/10 bg-[#141414] p-4">
+                        <h3 class="text-sm font-medium text-zinc-100">Top IPs by alerts</h3>
+                        {% set max_ip_count = namespace(val=1) %}
+                        {% for row in top_ips_by_alerts %}
+                            {% if row.alert_count > max_ip_count.val %}{% set max_ip_count.val = row.alert_count %}{% endif %}
+                        {% endfor %}
+                        <ul class="mt-3 space-y-2 text-xs">
+                            {% for row in top_ips_by_alerts[:8] %}
+                            <li>
+                                <div class="flex items-center justify-between gap-2 mb-1">
+                                    <span class="font-mono text-zinc-300 truncate max-w-[120px]" title="{{ row.ip }}">{{ row.ip }}</span>
+                                    <span class="flex items-center gap-1.5 shrink-0">
+                                        {% if row.current_state == "blocked" %}
+                                        <span class="text-red-300">blocked</span>
+                                        {% elif row.current_state == "throttled" %}
+                                        <span class="text-orange-300">throttled</span>
+                                        {% elif row.current_state == "suspicious" %}
+                                        <span class="text-amber-300">suspicious</span>
+                                        {% else %}
+                                        <span class="text-zinc-400">{{ row.current_state }}</span>
+                                        {% endif %}
+                                        <span class="text-zinc-500">{{ row.alert_count }}</span>
+                                    </span>
+                                </div>
+                                <div class="h-1 rounded-full bg-zinc-800">
+                                    <div
+                                        class="h-1 rounded-full {% if row.current_state == 'blocked' %}bg-red-500{% elif row.current_state == 'throttled' %}bg-orange-400{% elif row.current_state == 'suspicious' %}bg-amber-400{% else %}bg-zinc-500{% endif %}"
+                                        style="width: {{ (row.alert_count / max_ip_count.val * 100) | round | int }}%"
+                                    ></div>
+                                </div>
+                            </li>
+                            {% else %}
+                            <li class="text-zinc-500 py-2">No data.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <!-- Alerts over time -->
+                    <div class="rounded-md border border-white/10 bg-[#141414] p-4">
+                        <h3 class="text-sm font-medium text-zinc-100">Alerts over time</h3>
+                        {% set max_hourly = namespace(val=1) %}
+                        {% for row in alerts_per_hour %}
+                            {% if row.count > max_hourly.val %}{% set max_hourly.val = row.count %}{% endif %}
+                        {% endfor %}
+                        {% if alerts_per_hour %}
+                        <div class="mt-3 flex items-end gap-0.5 h-20">
+                            {% for row in alerts_per_hour %}
+                            {% set bar_pct = (row.count / max_hourly.val * 100) | round | int %}
+                            <div
+                                class="flex-1 bg-amber-400/80 rounded-sm min-h-[2px] cursor-default"
+                                style="height: {{ [bar_pct, 4] | max }}%"
+                                title="{{ row.hour.strftime('%H:%M') }} — {{ row.count }} alert(s)"
+                            ></div>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-1 flex justify-between text-xs text-zinc-600">
+                            {% if alerts_per_hour %}
+                            <span>{{ alerts_per_hour[0].hour.strftime("%H:%M") }}</span>
+                            <span>{{ alerts_per_hour[-1].hour.strftime("%H:%M") }}</span>
+                            {% endif %}
+                        </div>
+                        <p class="mt-2 text-xs text-zinc-500">
+                            {{ alerts_per_hour | sum(attribute='count') }} alerts across {{ alerts_per_hour | length }} hour(s)
+                        </p>
+                        {% else %}
+                        <p class="mt-4 text-sm text-zinc-500">No alerts in last 24h.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <!-- Overview section (attack map + counts) -->
             <section class="rounded-md border border-white/10 bg-[#1a1a1a]">
                 <div class="border-b border-white/10 px-4 py-4">
                     <h2 class="text-base font-semibold text-zinc-100">Overview</h2>
@@ -64,7 +217,7 @@
                         <div class="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
                             <div>
                                 <h3 class="text-sm font-medium text-zinc-100">Attack map</h3>
-                                <p class="mt-1 text-sm text-zinc-400">Recent geolocated alerts from the latest detections</p>
+                                <p class="mt-1 text-sm text-zinc-400">Recent alerts mapped to approximate public IP locations</p>
                             </div>
                             <a
                                 href="/alerts"
@@ -75,11 +228,11 @@
                         </div>
                         <div id="attack-map" class="h-[420px] w-full"></div>
                         <div id="map-status" class="border-t border-white/10 px-4 py-3 text-sm text-zinc-400">
-                            Loading map data...
+                            Loading map data and IP geolocation details...
                         </div>
                     </div>
                 </div>
-                <div class="grid gap-4 px-4 pb-4 md:grid-cols-2">
+                <div class="grid gap-4 px-4 pb-4 md:grid-cols-2 xl:grid-cols-4">
                     <div class="rounded-md border border-white/10 bg-[#141414] p-4">
                         <h3 class="text-sm font-medium text-zinc-100">Recent alert snapshot</h3>
                         <dl class="mt-3 space-y-2 text-sm">
@@ -88,16 +241,20 @@
                                 <dd class="text-zinc-100">{{ alerts|length }}</dd>
                             </div>
                             <div class="flex items-center justify-between gap-4">
-                                <dt class="text-zinc-400">Open</dt>
-                                <dd class="text-red-300">{{ summary.open }}</dd>
+                                <dt class="text-zinc-400">Blocked IPs</dt>
+                                <dd class="text-red-300">{{ blocked_ips|length }}</dd>
                             </div>
                             <div class="flex items-center justify-between gap-4">
-                                <dt class="text-zinc-400">Investigating</dt>
-                                <dd class="text-amber-300">{{ summary.investigating }}</dd>
+                                <dt class="text-zinc-400">Unresolved</dt>
+                                <dd class="text-amber-300">{{ summary.unresolved }}</dd>
                             </div>
                             <div class="flex items-center justify-between gap-4">
-                                <dt class="text-zinc-400">Resolved</dt>
-                                <dd class="text-emerald-300">{{ summary.resolved }}</dd>
+                                <dt class="text-zinc-400">Malicious</dt>
+                                <dd class="text-red-300">{{ summary.malicious }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Safe</dt>
+                                <dd class="text-emerald-300">{{ summary.safe }}</dd>
                             </div>
                         </dl>
                         <div class="mt-4">
@@ -107,6 +264,163 @@
                             >
                                 Open alerts page
                             </a>
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-white/10 bg-[#141414] p-4">
+                        <h3 class="text-sm font-medium text-zinc-100">Reputation states</h3>
+                        <dl class="mt-3 space-y-2 text-sm">
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Trusted</dt>
+                                <dd class="text-emerald-300">{{ state_counts.trusted }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Unknown</dt>
+                                <dd class="text-zinc-100">{{ state_counts.unknown }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Suspicious</dt>
+                                <dd class="text-amber-300">{{ state_counts.suspicious }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Throttled</dt>
+                                <dd class="text-orange-300">{{ state_counts.throttled }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-400">Blocked</dt>
+                                <dd class="text-red-300">{{ state_counts.blocked }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                    <div class="rounded-md border border-white/10 bg-[#141414] p-4 xl:col-span-2">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <h3 class="text-sm font-medium text-zinc-100">Top offenders</h3>
+                                <p class="mt-1 text-sm text-zinc-400">Highest current scores and enforcement context</p>
+                            </div>
+                            <span class="text-xs text-zinc-500">{{ top_offenders|length }} IPs</span>
+                        </div>
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="min-w-full divide-y divide-white/10 text-sm">
+                                <thead class="text-left text-zinc-500">
+                                    <tr>
+                                        <th class="py-2 pr-4 font-medium">IP</th>
+                                        <th class="py-2 pr-4 font-medium">State</th>
+                                        <th class="py-2 pr-4 font-medium">Score</th>
+                                        <th class="py-2 pr-4 font-medium">Block window</th>
+                                        <th class="py-2 font-medium">Reasons</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    {% for offender in top_offenders %}
+                                    <tr class="align-top">
+                                        <td class="py-3 pr-4 font-mono text-xs text-zinc-200">{{ offender.ip }}</td>
+                                        <td class="py-3 pr-4">
+                                            {% if offender.current_state == "blocked" %}
+                                            <span class="text-red-300">{{ offender.current_state }}</span>
+                                            {% elif offender.current_state == "throttled" %}
+                                            <span class="text-orange-300">{{ offender.current_state }}</span>
+                                            {% elif offender.current_state == "suspicious" %}
+                                            <span class="text-amber-300">{{ offender.current_state }}</span>
+                                            {% else %}
+                                            <span class="text-zinc-200">{{ offender.current_state }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-3 pr-4 text-zinc-100">{{ "%.2f"|format(offender.current_score) }}</td>
+                                        <td class="py-3 pr-4 text-zinc-300">
+                                            {% if offender.block_countdown_seconds and offender.block_countdown_seconds > 0 %}
+                                            {{ offender.block_countdown_seconds }}s
+                                            {% elif offender.cooldown_countdown_seconds and offender.cooldown_countdown_seconds > 0 %}
+                                            cooldown {{ offender.cooldown_countdown_seconds }}s
+                                            {% else %}
+                                            -
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-3 text-zinc-400">
+                                            {% if offender.reputation_reasons %}
+                                            {{ offender.reputation_reasons | join(", ") }}
+                                            {% else %}
+                                            No active reasons
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="py-6 text-center text-zinc-500">No IP reputation data yet.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid gap-4 px-4 pb-4 xl:grid-cols-[1.4fr_1fr]">
+                    <div class="rounded-md border border-white/10 bg-[#141414] p-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <h3 class="text-sm font-medium text-zinc-100">Recent reputation transitions</h3>
+                                <p class="mt-1 text-sm text-zinc-400">Automatic and analyst-driven state changes</p>
+                            </div>
+                            <span class="text-xs text-zinc-500">{{ recent_transitions|length }} entries</span>
+                        </div>
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="min-w-full divide-y divide-white/10 text-sm">
+                                <thead class="text-left text-zinc-500">
+                                    <tr>
+                                        <th class="py-2 pr-4 font-medium">Time</th>
+                                        <th class="py-2 pr-4 font-medium">IP</th>
+                                        <th class="py-2 pr-4 font-medium">Transition</th>
+                                        <th class="py-2 pr-4 font-medium">Score</th>
+                                        <th class="py-2 font-medium">Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    {% for transition in recent_transitions %}
+                                    <tr class="align-top">
+                                        <td class="py-3 pr-4 text-zinc-400">{{ transition.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                                        <td class="py-3 pr-4 font-mono text-xs text-zinc-200">{{ transition.ip }}</td>
+                                        <td class="py-3 pr-4 text-zinc-300">
+                                            {{ transition.old_state }} -> {{ transition.new_state }}
+                                            <div class="mt-1 text-xs text-zinc-500">{{ transition.manual_or_auto }}</div>
+                                        </td>
+                                        <td class="py-3 pr-4 text-zinc-300">
+                                            {{ "%.2f"|format(transition.score_before) }} -> {{ "%.2f"|format(transition.score_after) }}
+                                        </td>
+                                        <td class="py-3 text-zinc-400">{{ transition.trigger_reason.replace("_", " ") }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="py-6 text-center text-zinc-500">No reputation transitions recorded yet.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-white/10 bg-[#141414] p-4">
+                        <h3 class="text-sm font-medium text-zinc-100">Current block countdowns</h3>
+                        <div class="mt-4 space-y-3">
+                            {% for blocked_ip in blocked_ips %}
+                            <div class="rounded-md border border-white/10 bg-[#101010] p-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div class="font-mono text-xs text-zinc-200">{{ blocked_ip.ip }}</div>
+                                    <div class="text-xs {% if blocked_ip.manual_blocked %}text-red-300{% else %}text-zinc-400{% endif %}">
+                                        {% if blocked_ip.manual_blocked %}manual{% else %}auto{% endif %}
+                                    </div>
+                                </div>
+                                <div class="mt-2 flex items-center justify-between gap-3 text-sm">
+                                    <span class="text-zinc-400">{{ blocked_ip.blocked_reason or "blocked" }}</span>
+                                    <span class="text-red-300">
+                                        {% if blocked_ip.block_countdown_seconds and blocked_ip.block_countdown_seconds > 0 %}
+                                        {{ blocked_ip.block_countdown_seconds }}s
+                                        {% else %}
+                                        until analyst review
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                            {% else %}
+                            <p class="text-sm text-zinc-500">No IPs are currently blocked.</p>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -129,12 +443,8 @@
         }).addTo(attackMap);
 
         function getSeverityColor(severity) {
-            if (severity === "high") {
-                return "#ef4444";
-            }
-            if (severity === "medium") {
-                return "#f59e0b";
-            }
+            if (severity === "high") return "#ef4444";
+            if (severity === "medium") return "#f59e0b";
             return "#22c55e";
         }
 
@@ -142,79 +452,96 @@
             mapStatus.textContent = message;
         }
 
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+            }[c]));
+        }
+
+        function formatLocation(point) {
+            const parts = [point.city, point.subdivision, point.country].filter(Boolean);
+            return parts.length ? parts.join(", ") : "Unavailable";
+        }
+
+        function formatAccuracyRadius(point) {
+            const r = Number(point.accuracy_radius_km);
+            if (!Number.isFinite(r) || r <= 0) return "Unknown";
+            if (r < 1) return "< 1 km";
+            return r >= 10 ? `${r.toFixed(0)} km` : `${r.toFixed(1)} km`;
+        }
+
         function renderMapPoints(points) {
             markerLayer.clearLayers();
 
             if (!points.length) {
                 attackMap.setView([20, 0], 2);
-                setMapStatus("No geolocated alerts available.");
+                setMapStatus("No public IP geolocation data is available yet.");
                 return;
             }
 
             const bounds = [];
+            let rendered = 0;
 
             points.forEach((point) => {
-                const latitude = Number(point.lat);
-                const longitude = Number(point.lon);
-                if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-                    return;
+                const lat = Number(point.lat);
+                const lon = Number(point.lon);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+                const color = getSeverityColor(point.severity);
+                const r = Number(point.accuracy_radius_km);
+                if (Number.isFinite(r) && r > 0) {
+                    L.circle([lat, lon], {
+                        radius: Math.min(r, 250) * 1000,
+                        color, fillColor: color,
+                        fillOpacity: 0.08, opacity: 0.3, weight: 1,
+                    }).addTo(markerLayer);
                 }
 
-                const marker = L.circleMarker([latitude, longitude], {
-                    radius: 6,
-                    color: getSeverityColor(point.severity),
-                    fillColor: getSeverityColor(point.severity),
-                    fillOpacity: 0.85,
-                    weight: 1,
+                const marker = L.circleMarker([lat, lon], {
+                    radius: 6, color, fillColor: color, fillOpacity: 0.85, weight: 1,
                 });
 
-                marker.bindPopup(
-                    `
-                        <div style="min-width: 160px; color: #111827;">
-                            <div style="font-weight: 600;">${point.ip}</div>
-                            <div style="margin-top: 4px;">Type: ${point.type}</div>
-                            <div style="margin-top: 8px;">
-                                <a href="/alerts" style="color: #2563eb; text-decoration: underline;">Open alerts</a>
-                            </div>
-                        </div>
-                    `
-                );
+                const orgLine = point.organization
+                    ? `<div style="margin-top:4px;">Network: ${escapeHtml(point.organization)}</div>` : "";
+                const hostLine = point.is_hosting_provider
+                    ? `<div style="margin-top:4px;color:#b45309;">Hosted network (VPN/proxy/datacenter)</div>` : "";
+
+                marker.bindPopup(`
+                    <div style="min-width:160px;color:#111827;">
+                        <div style="font-weight:600;">${escapeHtml(point.ip)}</div>
+                        <div style="margin-top:4px;">Location: ${escapeHtml(formatLocation(point))}</div>
+                        <div style="margin-top:4px;">Accuracy: ${escapeHtml(formatAccuracyRadius(point))}</div>
+                        <div style="margin-top:4px;">Type: ${escapeHtml(point.type)}</div>
+                        ${orgLine}${hostLine}
+                        <div style="margin-top:8px;"><a href="/alerts" style="color:#2563eb;text-decoration:underline;">Open alerts</a></div>
+                    </div>
+                `);
 
                 marker.addTo(markerLayer);
-                bounds.push([latitude, longitude]);
+                bounds.push([lat, lon]);
+                rendered++;
             });
 
             if (!bounds.length) {
                 attackMap.setView([20, 0], 2);
-                setMapStatus("Map data loaded but no valid coordinates were available.");
+                setMapStatus("Map data loaded but no valid coordinates available.");
                 return;
             }
 
-            if (bounds.length === 1) {
-                attackMap.setView(bounds[0], 4);
-            } else {
-                attackMap.fitBounds(bounds, { padding: [30, 30] });
-            }
+            bounds.length === 1
+                ? attackMap.setView(bounds[0], 4)
+                : attackMap.fitBounds(bounds, { padding: [30, 30] });
 
-            setMapStatus(`Showing ${points.length} geolocated alert markers.`);
+            setMapStatus(`Showing ${rendered} geolocated alert marker(s).`);
         }
 
         async function loadMapData() {
             try {
-                const response = await fetch("/map-data");
-                if (!response.ok) {
-                    throw new Error(`Map data request failed with status ${response.status}`);
-                }
-
-                const data = await response.json();
-                console.log(data);
-                const points = data.filter((point) => (
-                    point
-                    && Number.isFinite(Number(point.lat))
-                    && Number.isFinite(Number(point.lon))
-                ));
-                renderMapPoints(points);
-            } catch (error) {
+                const res = await fetch("/map-data");
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                renderMapPoints(data.filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon))));
+            } catch {
                 markerLayer.clearLayers();
                 attackMap.setView([20, 0], 2);
                 setMapStatus("Map data is unavailable.");

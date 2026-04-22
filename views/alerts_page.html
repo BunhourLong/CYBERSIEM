@@ -28,6 +28,20 @@
                     >
                         Alerts
                     </a>
+                    <div class="flex items-center gap-2 pl-2 border-l border-zinc-700/60">
+                        <span class="font-mono text-xs text-zinc-400">{{ current_user.username }}</span>
+                        <span class="rounded px-1.5 py-0.5 text-xs font-medium
+                            {% if current_user.role == 'admin' %}bg-red-900/40 text-red-400
+                            {% elif current_user.role == 'analyst' %}bg-blue-900/40 text-blue-400
+                            {% else %}bg-zinc-800 text-zinc-500{% endif %}">
+                            {{ current_user.role }}
+                        </span>
+                        <form method="post" action="/logout">
+                            <button type="submit" class="rounded-md border border-zinc-700 px-3 py-2 text-zinc-400 transition-colors duration-150 hover:bg-zinc-800 hover:text-zinc-200">
+                                Sign out
+                            </button>
+                        </form>
+                    </div>
                 </nav>
             </div>
         </header>
@@ -36,7 +50,9 @@
             <section class="rounded-md border border-white/10 bg-[#1a1a1a]">
                 <div class="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-4">
                     <h2 class="text-base font-semibold text-zinc-100">Alerts</h2>
-                    <p class="text-sm text-zinc-400">Live table refreshes every 5 seconds</p>
+                    <p class="text-sm text-zinc-400">
+                        {{ blocked_ips|length }} blocked IPs - Live table refreshes every 5 seconds
+                    </p>
                 </div>
                 {% include "alerts_table.html" %}
             </section>

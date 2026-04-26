@@ -429,6 +429,10 @@
     </div>
 
     <script>
+        // Derive the path prefix this page is served under (e.g. "/siem" or "").
+        // Works correctly whether accessed directly or behind an nginx subpath proxy.
+        const API_BASE = window.location.pathname.replace(/\/[^/]*$/, "");
+
         const attackMap = L.map("attack-map", {
             zoomControl: true,
             attributionControl: true,
@@ -537,7 +541,7 @@
 
         async function loadMapData() {
             try {
-                const res = await fetch("/map-data");
+                const res = await fetch(API_BASE + "/map-data");
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 renderMapPoints(data.filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon))));

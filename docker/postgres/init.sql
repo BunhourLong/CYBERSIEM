@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS ip_reputations (
     safe_alert_count INTEGER NOT NULL DEFAULT 0,
     unresolved_alert_count INTEGER NOT NULL DEFAULT 0,
     malicious_alert_count INTEGER NOT NULL DEFAULT 0,
+    alert_hold_active BOOLEAN NOT NULL DEFAULT FALSE,
     threshold_reached BOOLEAN NOT NULL DEFAULT FALSE,
     last_seen TIMESTAMPTZ,
     last_alert_at TIMESTAMPTZ,

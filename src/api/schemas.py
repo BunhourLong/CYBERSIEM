@@ -42,6 +42,7 @@ class AlertResponse(BaseModel):
     manual_blocked: bool = False
     blocked_reason: str | None = None
     threshold_reached: bool = False
+    alert_hold_active: bool = False
     reputation_reasons: list[str] = Field(default_factory=list)
     block_countdown_seconds: int | None = None
     cooldown_countdown_seconds: int | None = None
@@ -115,6 +116,8 @@ class BlockedIPResponse(BaseModel):
     unresolved_alert_count: int = 0
     malicious_alert_count: int = 0
     threshold_reached: bool = False
+    alert_hold_active: bool = False
+    unblock_eligible: bool = True
     reputation_reasons: list[str] = Field(default_factory=list)
     block_countdown_seconds: int | None = None
     cooldown_countdown_seconds: int | None = None
@@ -136,6 +139,7 @@ class IPControlRequest(BaseModel):
     action: Literal[
         "manual_block",
         "manual_unblock",
+        "force_unblock",
         "trust",
         "whitelist",
         "clear_trust",

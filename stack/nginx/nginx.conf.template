@@ -1,0 +1,127 @@
+worker_processes auto;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include      /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    server_tokens off;
+
+    # Trust forwarded client IPs from local/private proxy hops.
+    set_real_ip_from 127.0.0.1;
+    set_real_ip_from 10.0.0.0/8;
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    real_ip_header    X-Forwarded-For;
+    real_ip_recursive on;
+
+    # Must match the format the security engine parser expects.
+    log_format cybersiem_combined '$remote_addr - $remote_user [$time_local] '
+                                  '"$request" $status $body_bytes_sent '
+                                  '"$http_referer" "$http_user_agent" '
+                                  '"$http_x_forwarded_for" "$http_x_real_ip" "$realip_remote_addr"';
+
+    access_log /var/log/nginx/access.log cybersiem_combined;
+    error_log  /var/log/nginx/error.log warn;
+
+    sendfile      on;
+    keepalive_timeout 65;
+
+    # ── Primary server — domain set via NGINX_HOST in .env ───────────────────
+    server {
+        listen 80;
+        server_name ${NGINX_HOST};
+
+        # IP blocklist managed by Cappa security engine (hot-reloaded).
+        include /etc/nginx/dynamic/blocklist.conf;
+
+        # ── /siem → Cappa (FastAPI) ─────────────────────────────────────────
+        # Bare /siem redirects to login so bookmarked URLs work.
+        location = /siem {
+            return 301 /siem/login;
+        }
+
+        location /siem/ {
+            # Strip the /siem prefix before forwarding to FastAPI.
+            rewrite ^/siem/(.*)$ /$1 break;
+            proxy_pass http://cybersiem_api:8000;
+
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Required so sub_filter can inspect the uncompressed response body.
+            proxy_set_header Accept-Encoding   "";
+
+            # Rewrite Location headers in 302 responses (FastAPI redirects) so
+            # the browser follows /siem/<path> instead of bare /<path>.
+            proxy_redirect ~^/(.*)$ /siem/$1;
+
+            # Rewrite absolute paths in HTML responses so internal links work
+            # when the app is mounted at /siem/ instead of /.
+            sub_filter_types text/html;
+            sub_filter_once  off;
+            sub_filter 'href="/'       'href="/siem/';
+            sub_filter 'action="/'    'action="/siem/';
+            sub_filter 'hx-get="/'    'hx-get="/siem/';
+            sub_filter 'hx-post="/'   'hx-post="/siem/';
+            sub_filter 'hx-delete="/' 'hx-delete="/siem/';
+            sub_filter 'hx-patch="/'  'hx-patch="/siem/';
+            sub_filter 'hx-put="/'    'hx-put="/siem/';
+            sub_filter "fetch('/map-data" "fetch('/siem/map-data";
+        }
+
+        # ── /admin → Express admin panel ────────────────────────────────────
+        location = /admin {
+            return 301 /admin/;
+        }
+
+        location /admin/ {
+            # Strip the /admin prefix before forwarding to Express.
+            rewrite ^/admin/(.*)$ /$1 break;
+            proxy_pass http://express_app:3000;
+
+            # Set Host to admin.localhost so vhost() routes to the admin app.
+            proxy_set_header Host              admin.localhost;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            proxy_set_header Accept-Encoding   "";
+
+            proxy_redirect ~^/(.*)$ /admin/$1;
+
+            sub_filter_types text/html;
+            sub_filter_once  off;
+            sub_filter 'href="/'   'href="/admin/';
+            sub_filter 'action="/' 'action="/admin/';
+            sub_filter 'src="/'    'src="/admin/';
+        }
+
+        # ── / → Express public BookMark site ────────────────────────────────
+        location / {
+            proxy_pass http://express_app:3000;
+            proxy_set_header Host              localhost;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # ── Health check ─────────────────────────────────────────────────────
+        location = /health {
+            add_header Content-Type text/plain;
+            return 200 'ok';
+        }
+    }
+
+    # ── catch-all: drop requests with unknown Host headers ───────────────────
+    server {
+        listen 80 default_server;
+        server_name _;
+        return 444;
+    }
+}

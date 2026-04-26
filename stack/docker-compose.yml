@@ -1,0 +1,138 @@
+services:
+
+  # ── Shared nginx reverse proxy ──────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: stack_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      NGINX_HOST: ${NGINX_HOST}
+    volumes:
+      - ./nginx/nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+      - nginx_logs:/var/log/nginx
+      - nginx_dynamic:/etc/nginx/dynamic
+    # Render nginx.conf from template (substitutes NGINX_HOST), then start nginx
+    # with a blocklist hot-reload loop in the background.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        envsubst '$${NGINX_HOST}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+        mkdir -p /var/log/nginx /etc/nginx/dynamic
+        rm -f /var/log/nginx/access.log /var/log/nginx/error.log
+        touch /var/log/nginx/access.log /var/log/nginx/error.log
+        if [ ! -f /etc/nginx/dynamic/blocklist.conf ]; then
+          printf '# Managed by Cappa. Do not edit manually.\n' > /etc/nginx/dynamic/blocklist.conf
+        fi
+        BLOCKLIST_CHECKSUM="$$(sha256sum /etc/nginx/dynamic/blocklist.conf | awk '{print $$1}')"
+        (
+          while true; do
+            NEW_CHECKSUM="$$(sha256sum /etc/nginx/dynamic/blocklist.conf | awk '{print $$1}')"
+            if [ "$$NEW_CHECKSUM" != "$$BLOCKLIST_CHECKSUM" ]; then
+              BLOCKLIST_CHECKSUM="$$NEW_CHECKSUM"
+              nginx -t && nginx -s reload || echo '[nginx] blocklist reload failed'
+            fi
+            sleep 2
+          done
+        ) &
+        exec nginx -g 'daemon off;'
+    depends_on:
+      - express_app
+      - cybersiem_api
+
+  # ── BookMark-Publisher (Express) ────────────────────────────────────────────
+  express_app:
+    build:
+      context: ../../bookmark-publisher
+    container_name: stack_express
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      TRUST_PROXY: "true"
+      NODE_ENV: production
+      ADMIN_EMAIL: ${EXPRESS_ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${EXPRESS_ADMIN_PASSWORD}
+      SECURITY_LAB_MODE: ${SECURITY_LAB_MODE}
+      SECURITY_ADMIN_TOKEN: ${SECURITY_ADMIN_TOKEN}
+      SECURITY_CONSOLE_LOG_ENABLED: ${SECURITY_CONSOLE_LOG_ENABLED}
+      SECURITY_RATE_LIMIT_WINDOW_MS: ${SECURITY_RATE_LIMIT_WINDOW_MS}
+      SECURITY_RATE_LIMIT_MAX: ${SECURITY_RATE_LIMIT_MAX}
+      SECURITY_FAILED_LOGIN_THRESHOLD: ${SECURITY_FAILED_LOGIN_THRESHOLD}
+      SECURITY_FAILED_LOGIN_WINDOW_MS: ${SECURITY_FAILED_LOGIN_WINDOW_MS}
+      SECURITY_ABUSE_ALERT_THRESHOLD: ${SECURITY_ABUSE_ALERT_THRESHOLD}
+      SECURITY_ABUSE_BLOCK_THRESHOLD: ${SECURITY_ABUSE_BLOCK_THRESHOLD}
+      SECURITY_AUTO_BLOCK_ENABLED: ${SECURITY_AUTO_BLOCK_ENABLED}
+      SECURITY_MAX_EVENTS: ${SECURITY_MAX_EVENTS}
+    volumes:
+      - express_storage:/app/storage
+
+  # ── Cappa FastAPI ───────────────────────────────────────────────────────────
+  cybersiem_api:
+    build:
+      context: ../
+      dockerfile: docker/api.Dockerfile
+    container_name: stack_cybersiem_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      GEOIP_DB_PATH: ${GEOIP_DB_PATH}
+      GEOIP_ASN_DB_PATH: ${GEOIP_ASN_DB_PATH}
+      NGINX_BLOCKLIST_PATH: ${NGINX_BLOCKLIST_PATH}
+      REPUTATION_BLOCK_DURATION_SECONDS: ${REPUTATION_BLOCK_DURATION_SECONDS}
+      REPUTATION_COOLDOWN_DURATION_SECONDS: ${REPUTATION_COOLDOWN_DURATION_SECONDS}
+      REPUTATION_SUPPRESS_DURATION_SECONDS: ${REPUTATION_SUPPRESS_DURATION_SECONDS}
+      REPUTATION_DECAY_PER_HOUR: ${REPUTATION_DECAY_PER_HOUR}
+      REPUTATION_REPEATED_MEDIUM_ALERT_COUNT: ${REPUTATION_REPEATED_MEDIUM_ALERT_COUNT}
+      SESSION_SECRET: ${SIEM_SESSION_SECRET}
+      ADMIN_USERNAME: ${SIEM_ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${SIEM_ADMIN_PASSWORD}
+      SESSION_SECURE: ${SESSION_SECURE}
+    volumes:
+      - ../data:/data:ro
+      - nginx_dynamic:/shared-nginx
+    depends_on:
+      - postgres
+
+  # ── Cappa security engine ───────────────────────────────────────────────────
+  security_engine:
+    build:
+      context: ../
+      dockerfile: docker/security_engine.Dockerfile
+    container_name: stack_security_engine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NGINX_ACCESS_LOG: ${NGINX_ACCESS_LOG}
+      NGINX_BLOCKLIST_PATH: ${NGINX_BLOCKLIST_PATH}
+      REPUTATION_BLOCK_DURATION_SECONDS: ${REPUTATION_BLOCK_DURATION_SECONDS}
+      REPUTATION_COOLDOWN_DURATION_SECONDS: ${REPUTATION_COOLDOWN_DURATION_SECONDS}
+      REPUTATION_SUPPRESS_DURATION_SECONDS: ${REPUTATION_SUPPRESS_DURATION_SECONDS}
+      REPUTATION_DECAY_PER_HOUR: ${REPUTATION_DECAY_PER_HOUR}
+      REPUTATION_REPEATED_MEDIUM_ALERT_COUNT: ${REPUTATION_REPEATED_MEDIUM_ALERT_COUNT}
+    volumes:
+      - nginx_logs:/var/log/nginx
+      - nginx_dynamic:/shared-nginx
+    depends_on:
+      - postgres
+      - nginx
+
+  # ── Postgres (shared) ───────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    container_name: stack_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+volumes:
+  postgres_data:
+  nginx_logs:
+  nginx_dynamic:
+  express_storage:

@@ -119,6 +119,7 @@ def _serialize_alert(alert: dict) -> AlertResponse:
     payload["blocked_reason"] = payload.get("blocked_reason")
     payload["whitelist"] = bool(payload.get("whitelist", False))
     payload["threshold_reached"] = bool(payload.get("threshold_reached", False))
+    payload["alert_hold_active"] = bool(payload.get("alert_hold_active", False))
     payload["reputation_reasons"] = list(payload.get("reputation_reasons") or [])
     payload["block_countdown_seconds"] = _seconds_until(payload.get("blocked_until"))
     payload["cooldown_countdown_seconds"] = _seconds_until(payload.get("cooldown_until"))
@@ -157,6 +158,10 @@ def _serialize_blocked_ip(record: dict) -> BlockedIPResponse:
     payload["whitelist"] = bool(payload.get("whitelist", False))
     payload["block_count"] = int(payload.get("block_count") or 0)
     payload["offense_streak"] = int(payload.get("offense_streak") or 0)
+    payload["alert_hold_active"] = bool(payload.get("alert_hold_active", False))
+    unresolved = int(payload.get("unresolved_alert_count") or 0)
+    malicious = int(payload.get("malicious_alert_count") or 0)
+    payload["unblock_eligible"] = (unresolved == 0 and malicious == 0)
     payload["reputation_reasons"] = list(payload.get("reputation_reasons") or [])
     payload["block_countdown_seconds"] = _seconds_until(payload.get("blocked_until"))
     payload["cooldown_countdown_seconds"] = _seconds_until(payload.get("cooldown_until"))
@@ -393,6 +398,7 @@ def _alerts_context(
     filter_status: str | None = None,
     filter_ip: str | None = None,
     blocked_only: bool = False,
+    current_user: UserSession | None = None,
 ) -> dict:
     alerts = _list_serialized_alerts(
         limit=limit,
@@ -417,6 +423,7 @@ def _alerts_context(
         "filter_status": filter_status or "",
         "filter_ip": filter_ip or "",
         "blocked_only": blocked_only,
+        "current_user": current_user,
     }
 
 
@@ -454,6 +461,7 @@ def _render_alerts_partial(
     filter_status: str | None = None,
     filter_ip: str | None = None,
     blocked_only: bool = False,
+    current_user: UserSession | None = None,
 ) -> HTMLResponse:
     _refresh_reputation_views(trigger_reason="alerts_partial_refresh")
     return templates.TemplateResponse(
@@ -467,6 +475,7 @@ def _render_alerts_partial(
             filter_status=filter_status,
             filter_ip=filter_ip,
             blocked_only=blocked_only,
+            current_user=current_user,
         ),
     )
 
@@ -795,6 +804,7 @@ def _update_alert_status_response(
     filter_status: str | None = None,
     filter_ip: str | None = None,
     blocked_only: bool = False,
+    current_user: UserSession | None = None,
 ):
     alert = enforcement_service.update_alert_status(alert_id, status)
     if not alert:
@@ -806,6 +816,7 @@ def _update_alert_status_response(
             filter_type=filter_type, filter_severity=filter_severity,
             filter_status=filter_status, filter_ip=filter_ip,
             blocked_only=blocked_only,
+            current_user=current_user,
         )
 
     return _serialize_alert(alert)
@@ -821,6 +832,7 @@ def _manual_block_response(
     filter_status: str | None = None,
     filter_ip: str | None = None,
     blocked_only: bool = False,
+    current_user: UserSession | None = None,
 ):
     record = enforcement_service.manual_block_ip(ip, reason)
     if _wants_html(request):
@@ -829,6 +841,7 @@ def _manual_block_response(
             filter_type=filter_type, filter_severity=filter_severity,
             filter_status=filter_status, filter_ip=filter_ip,
             blocked_only=blocked_only,
+            current_user=current_user,
         )
     return _serialize_blocked_ip(record)
 
@@ -842,14 +855,19 @@ def _manual_unblock_response(
     filter_status: str | None = None,
     filter_ip: str | None = None,
     blocked_only: bool = False,
+    current_user: UserSession | None = None,
 ):
-    record = enforcement_service.manual_unblock_ip(ip)
+    try:
+        record = enforcement_service.manual_unblock_ip(ip)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if _wants_html(request):
         return _render_alerts_partial(
             request, limit=limit,
             filter_type=filter_type, filter_severity=filter_severity,
             filter_status=filter_status, filter_ip=filter_ip,
             blocked_only=blocked_only,
+            current_user=current_user,
         )
     return _serialize_blocked_ip(record)
 
@@ -863,6 +881,7 @@ def _ip_control_response(
     filter_status: str | None = None,
     filter_ip: str | None = None,
     blocked_only: bool = False,
+    current_user: UserSession | None = None,
 ):
     try:
         record = enforcement_service.apply_ip_control(
@@ -880,6 +899,7 @@ def _ip_control_response(
             filter_type=filter_type, filter_severity=filter_severity,
             filter_status=filter_status, filter_ip=filter_ip,
             blocked_only=blocked_only,
+            current_user=current_user,
         )
 
     return _serialize_blocked_ip(record)
@@ -925,6 +945,7 @@ async def block_ip_entry(
         filter_type=type or None, filter_severity=severity or None,
         filter_status=status or None, filter_ip=ip_filter or None,
         blocked_only=blocked_only,
+        current_user=session,
     )
 
 
@@ -948,6 +969,7 @@ def unblock_ip_entry(
         filter_type=type or None, filter_severity=severity or None,
         filter_status=status or None, filter_ip=ip_filter or None,
         blocked_only=blocked_only,
+        current_user=session,
     )
 
 
@@ -971,6 +993,7 @@ async def ip_controls(
         filter_type=type or None, filter_severity=severity or None,
         filter_status=status or None, filter_ip=ip_filter or None,
         blocked_only=blocked_only,
+        current_user=session,
     )
 
 
@@ -1042,7 +1065,7 @@ def alerts_partial(
     ip: str = "",
     blocked_only: bool = False,
 ):
-    _, err = _require_analyst(request)
+    session, err = _require_analyst(request)
     if err:
         return err
     return _render_alerts_partial(
@@ -1052,6 +1075,7 @@ def alerts_partial(
         filter_status=status or None,
         filter_ip=ip or None,
         blocked_only=blocked_only,
+        current_user=session,
     )
 
 
@@ -1075,7 +1099,7 @@ async def update_alert_status(
     ip: str = "",
     blocked_only: bool = False,
 ):
-    _, err = _require_analyst(request)
+    session, err = _require_analyst(request)
     if err:
         return err
     payload = await _get_status_update_payload(request)
@@ -1084,6 +1108,7 @@ async def update_alert_status(
         filter_type=type or None, filter_severity=severity or None,
         filter_status=status or None, filter_ip=ip or None,
         blocked_only=blocked_only,
+        current_user=session,
     )
 
 
@@ -1098,7 +1123,7 @@ async def patch_alert_status(
     ip: str = "",
     blocked_only: bool = False,
 ):
-    _, err = _require_analyst(request)
+    session, err = _require_analyst(request)
     if err:
         return err
     payload = await _get_status_update_payload(request)
@@ -1107,6 +1132,7 @@ async def patch_alert_status(
         filter_type=type or None, filter_severity=severity or None,
         filter_status=status or None, filter_ip=ip or None,
         blocked_only=blocked_only,
+        current_user=session,
     )
 
 

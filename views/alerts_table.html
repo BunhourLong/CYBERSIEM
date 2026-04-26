@@ -251,6 +251,35 @@
                         </button>
                     </form>
                     {% if alert.manual_blocked or alert.current_state == "blocked" %}
+                    {% if alert.alert_hold_active %}
+                    <button
+                        type="button"
+                        disabled
+                        title="Alert hold active — mark all alerts safe before releasing"
+                        onclick="event.stopPropagation()"
+                        class="mt-2 rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-500 cursor-not-allowed opacity-50"
+                    >
+                        Hold active ({{ (alert.unresolved_alert_count or 0) + (alert.malicious_alert_count or 0) }} pending)
+                    </button>
+                    {% if current_user and current_user.role == "admin" %}
+                    <form
+                        class="mt-1"
+                        hx-post="/ip-controls?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip_filter={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
+                        hx-target="#alerts-table"
+                        hx-swap="outerHTML"
+                        onclick="event.stopPropagation()"
+                    >
+                        <input type="hidden" name="ip" value="{{ alert.ip }}">
+                        <input type="hidden" name="action" value="force_unblock">
+                        <button
+                            type="submit"
+                            class="rounded-md border border-amber-600 px-3 py-1.5 text-xs font-medium text-amber-300 transition-colors duration-150 hover:bg-amber-900/30"
+                        >
+                            Force release (admin)
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% else %}
                     <button
                         type="button"
                         hx-delete="/blocked-ips/{{ alert.ip }}?limit={{ limit }}&type={{ filter_type }}&severity={{ filter_severity }}&status={{ filter_status }}&ip_filter={{ filter_ip }}{% if blocked_only %}&blocked_only=true{% endif %}"
@@ -261,6 +290,7 @@
                     >
                         Release block
                     </button>
+                    {% endif %}
                     {% else %}
                     <form
                         class="mt-2"
@@ -394,6 +424,27 @@
                                 ({{ alert.blocked_reason.replace("_", " ") }})
                                 {% endif %}
                             </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-zinc-500">Alert hold</p>
+                            {% if alert.alert_hold_active %}
+                            <p class="mt-1 text-sm text-red-300 font-medium">
+                                Active —
+                                {% set pending = (alert.unresolved_alert_count or 0) + (alert.malicious_alert_count or 0) %}
+                                {{ pending }} alert(s) pending review
+                                ({{ alert.unresolved_alert_count or 0 }} unresolved,
+                                 {{ alert.malicious_alert_count or 0 }} malicious,
+                                 {{ alert.safe_alert_count or 0 }} safe)
+                            </p>
+                            {% else %}
+                            <p class="mt-1 text-sm text-emerald-300">
+                                {% if alert.safe_alert_count and alert.safe_alert_count > 0 %}
+                                Cleared — all {{ alert.safe_alert_count }} alert(s) safe
+                                {% else %}
+                                Inactive
+                                {% endif %}
+                            </p>
+                            {% endif %}
                         </div>
                         <div>
                             <p class="text-xs text-zinc-500">Current score</p>

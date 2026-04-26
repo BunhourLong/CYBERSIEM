@@ -165,6 +165,14 @@ class EnforcementService:
         )
 
     def manual_unblock_ip(self, ip: str) -> dict:
+        record = self._get_existing_record(ip)
+        if record.alert_hold_active:
+            pending = record.unresolved_alert_count + record.malicious_alert_count
+            raise ValueError(
+                f"Cannot unblock {ip}: alert hold is active "
+                f"({pending} unresolved/malicious alert(s) still require analyst review). "
+                "Mark all alerts safe first, or use force_unblock (admin only)."
+            )
         now = utc_now()
         self.repository.set_ip_override_fields(
             ip,
@@ -178,6 +186,26 @@ class EnforcementService:
         return self.sync_ip_and_blocklist(
             ip,
             trigger_reason="manual_unblock_requested",
+            manual_or_auto="manual",
+            now=now,
+        )
+
+    def force_unblock_ip(self, ip: str, duration_seconds: int | None = None) -> dict:
+        """Admin-only: release an alert-hold block for a cooldown window, bypassing alert review."""
+        now = utc_now()
+        window = duration_seconds or self.config.suppress_duration_seconds
+        self.repository.set_ip_override_fields(
+            ip,
+            whitelist=False,
+            analyst_override="force_unblock",
+            blocked_until=None,
+            cooldown_until=now + timedelta(seconds=max(1, window)),
+            blocked_reason=None,
+            manual_blocked=False,
+        )
+        return self.sync_ip_and_blocklist(
+            ip,
+            trigger_reason="force_unblock_requested",
             manual_or_auto="manual",
             now=now,
         )
@@ -269,6 +297,8 @@ class EnforcementService:
             return self.manual_block_ip(ip, reason)
         if action == "manual_unblock":
             return self.manual_unblock_ip(ip)
+        if action == "force_unblock":
+            return self.force_unblock_ip(ip, duration_seconds=duration_seconds)
         if action in {"trust", "whitelist"}:
             return self.trust_ip(ip, whitelist=action == "whitelist")
         if action in {"clear_trust", "unwhitelist"}:

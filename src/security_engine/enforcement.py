@@ -15,7 +15,12 @@ ANALYST_OVERRIDE_VALUES = (
     "manual_block",
     "trusted",
     "suppress_auto_block",
+    "force_unblock",
 )
+
+# Alerts with weight >= this threshold (or severity == "high") trigger an alert hold:
+# the IP stays blocked until every alert for that IP is marked safe.
+ALERT_HOLD_MIN_WEIGHT = 20.0
 
 DEFAULT_STATE_THRESHOLDS = {
     "trusted": 0.0,
@@ -264,6 +269,7 @@ class IPReputationRecord:
     safe_alert_count: int = 0
     unresolved_alert_count: int = 0
     malicious_alert_count: int = 0
+    alert_hold_active: bool = False
     updated_at: datetime | None = None
     reputation_reasons: list[str] = field(default_factory=list)
 
@@ -320,6 +326,7 @@ def build_record_from_row(row: dict | None) -> IPReputationRecord | None:
         safe_alert_count=int(row.get("safe_alert_count") or 0),
         unresolved_alert_count=int(row.get("unresolved_alert_count") or 0),
         malicious_alert_count=int(row.get("malicious_alert_count") or row.get("malicious_count") or 0),
+        alert_hold_active=bool(row.get("alert_hold_active", False)),
         updated_at=ensure_utc(row.get("updated_at")),
         reputation_reasons=list(row.get("reputation_reasons") or []),
     )
@@ -381,6 +388,14 @@ def evaluate_ip_reputation(
     unresolved_alert_count = sum(1 for alert in alert_evidence if alert.status == "unresolved")
     malicious_alert_count = sum(1 for alert in alert_evidence if alert.status == "malicious")
     alert_count = len(alert_evidence)
+
+    # Hold is active when any non-safe alert meets the actionable threshold.
+    # It clears only when every alert for this IP has been marked safe.
+    new_alert_hold = (unresolved_alert_count > 0 or malicious_alert_count > 0) and any(
+        config.weight_for_alert(a.alert_type, a.severity) >= ALERT_HOLD_MIN_WEIGHT
+        or a.severity == "high"
+        for a in alert_evidence
+    )
 
     current_score = 0.0
     lifetime_score = 0.0
@@ -465,11 +480,16 @@ def evaluate_ip_reputation(
         analyst_override = None
         cooldown_until = None
 
+    if analyst_override == "force_unblock" and cooldown_until and cooldown_until <= now:
+        analyst_override = None
+        cooldown_until = None
+
     if blocked_until and blocked_until <= now and previous_record.current_state == "blocked":
         blocked_until = None
         if cooldown_until is None or cooldown_until <= now:
             cooldown_until = now + timedelta(seconds=config.cooldown_duration_seconds)
 
+    alert_hold_active = False
     has_direct_critical = bool(critical_alert_ids)
     has_repeated_medium = repeated_medium_count >= config.repeated_medium_alert_count
     sustained_block_score = current_score >= config.blocked_threshold
@@ -481,10 +501,24 @@ def evaluate_ip_reputation(
         blocked_until = None
         blocked_reason = None
         reasons.append("analyst_trusted_ip")
+    elif analyst_override == "force_unblock" and cooldown_until and cooldown_until > now:
+        # Admin-forced release: bypasses alert hold and score-based auto-block for the cooldown window.
+        current_state = config.state_for_score(current_score)
+        blocked_until = None
+        blocked_reason = None
+        reasons.append("force_unblock_override")
     elif analyst_override == "manual_block":
         current_state = "blocked"
         blocked_reason = previous_record.blocked_reason or "manual_block"
+        alert_hold_active = new_alert_hold
         reasons.append("manual_block_override")
+    elif new_alert_hold:
+        # Alert hold: IP stays blocked until every alert is reviewed and marked safe.
+        current_state = "blocked"
+        blocked_until = None  # no timer expiry — cleared only by alert review
+        blocked_reason = "alert_hold"
+        alert_hold_active = True
+        reasons.append("alert_hold")
     elif blocked_until and blocked_until > now:
         current_state = "blocked"
         blocked_reason = previous_record.blocked_reason or "block_window_active"
@@ -557,6 +591,7 @@ def evaluate_ip_reputation(
         safe_alert_count=safe_alert_count,
         unresolved_alert_count=unresolved_alert_count,
         malicious_alert_count=malicious_alert_count,
+        alert_hold_active=alert_hold_active,
         updated_at=now,
         reputation_reasons=list(dict.fromkeys(reasons)),
         score_before=_round_score(previous_record.current_score),

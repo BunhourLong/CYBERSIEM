@@ -53,6 +53,7 @@ ALERT_WITH_REPUTATION_SELECT = """
         ip_reputations.safe_alert_count,
         ip_reputations.unresolved_alert_count,
         ip_reputations.malicious_alert_count,
+        ip_reputations.alert_hold_active,
         ip_reputations.reputation_reasons
     FROM alerts
     LEFT JOIN ip_reputations ON ip_reputations.ip = alerts.ip
@@ -82,6 +83,7 @@ IP_REPUTATION_SELECT = """
         safe_alert_count,
         unresolved_alert_count,
         malicious_alert_count,
+        alert_hold_active,
         reputation_reasons,
         updated_at
     FROM ip_reputations
@@ -236,6 +238,9 @@ class SecurityRepository:
                 )
                 cur.execute(
                     "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS reputation_reasons JSONB NOT NULL DEFAULT '[]'::jsonb"
+                )
+                cur.execute(
+                    "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS alert_hold_active BOOLEAN NOT NULL DEFAULT FALSE"
                 )
                 cur.execute(
                     """
@@ -646,6 +651,7 @@ class SecurityRepository:
                         safe_alert_count,
                         unresolved_alert_count,
                         malicious_alert_count,
+                        alert_hold_active,
                         threshold_reached,
                         last_seen,
                         last_alert_at,
@@ -658,7 +664,7 @@ class SecurityRepository:
                     )
                     VALUES (
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s::jsonb, NOW()
+                        %s, %s, %s, %s, %s, %s, %s, %s::jsonb, NOW()
                     )
                     ON CONFLICT (ip) DO UPDATE
                     SET
@@ -676,6 +682,7 @@ class SecurityRepository:
                         safe_alert_count = EXCLUDED.safe_alert_count,
                         unresolved_alert_count = EXCLUDED.unresolved_alert_count,
                         malicious_alert_count = EXCLUDED.malicious_alert_count,
+                        alert_hold_active = EXCLUDED.alert_hold_active,
                         threshold_reached = EXCLUDED.threshold_reached,
                         last_seen = EXCLUDED.last_seen,
                         last_alert_at = EXCLUDED.last_alert_at,
@@ -701,6 +708,7 @@ class SecurityRepository:
                         safe_alert_count,
                         unresolved_alert_count,
                         malicious_alert_count,
+                        alert_hold_active,
                         threshold_reached,
                         last_seen,
                         last_alert_at,
@@ -727,6 +735,7 @@ class SecurityRepository:
                         evaluation.safe_alert_count,
                         evaluation.unresolved_alert_count,
                         evaluation.malicious_alert_count,
+                        evaluation.alert_hold_active,
                         evaluation.threshold_reached,
                         evaluation.last_seen,
                         evaluation.last_alert_at,
@@ -809,6 +818,7 @@ class SecurityRepository:
                         safe_alert_count,
                         unresolved_alert_count,
                         malicious_alert_count,
+                        alert_hold_active,
                         threshold_reached,
                         last_seen,
                         last_alert_at,

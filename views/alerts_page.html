@@ -50,9 +50,22 @@
             <section class="rounded-md border border-white/10 bg-[#1a1a1a]">
                 <div class="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-4">
                     <h2 class="text-base font-semibold text-zinc-100">Alerts</h2>
-                    <p class="text-sm text-zinc-400">
-                        {{ blocked_ips|length }} blocked IPs - Live table refreshes every 5 seconds
-                    </p>
+                    <div class="flex items-center gap-3">
+                        <p class="text-sm text-zinc-400">
+                            {{ blocked_ips|length }} blocked IPs — live, refreshes every 5s
+                        </p>
+                        {% if current_user and current_user.role == "admin" %}
+                        <button
+                            hx-delete="/alerts"
+                            hx-target="#alerts-table"
+                            hx-swap="outerHTML"
+                            hx-confirm="Delete ALL alerts permanently? This cannot be undone."
+                            class="rounded-md border border-red-800 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors duration-150 hover:bg-red-900/30"
+                        >
+                            Clear all alerts
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
                 {% include "alerts_table.html" %}
             </section>

@@ -555,6 +555,14 @@ class SecurityRepository:
             conn.commit()
         return row
 
+    def delete_all_alerts(self) -> int:
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM alerts")
+                deleted = cur.rowcount
+            conn.commit()
+        return deleted
+
     def summarize_alerts_for_ip(self, ip: str) -> dict:
         with self.connection() as conn:
             with conn.cursor() as cur:

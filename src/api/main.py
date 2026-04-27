@@ -1136,6 +1136,16 @@ async def patch_alert_status(
     )
 
 
+@app.delete("/alerts")
+def delete_all_alerts(request: Request):
+    session, err = _require_admin(request)
+    if err:
+        return err
+    deleted = repository.delete_all_alerts()
+    _audit(session.username, "delete_all_alerts", f"{deleted} alerts deleted", request)
+    return _render_alerts_partial(request, current_user=session)
+
+
 @app.post("/block-ip", response_model=AlertResponse)
 def block_ip(payload: BlockIPRequest, request: Request):
     session, err = _require_analyst(request)

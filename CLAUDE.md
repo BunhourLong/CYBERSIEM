@@ -54,11 +54,11 @@ Provisional until T-052 tests the OpenCode Go models on this repo. Details: plan
 | Find code, chores | Go: DeepSeek V4.1 Flash | same |
 | Write code, apply fixes | Go: DeepSeek V4.1 Flash | Claude Sonnet, `implementer` |
 | Review the diff | Claude Sonnet, `reviewer` | same, plus Go: Gemini 4 Argon |
-| Write tests | Go: GLM-5.2 | same |
+| Write tests | Go: Kimi K3.1 Pro, then GLM-5.2 at its cap | Claude Sonnet, `test-writer` |
 | Run tests, scans, eval | No model: `task brief` | same |
 | Attack the change | Go: Gemini 4 Argon | Claude Opus, `pentester` |
 
-Go models run through `task ai`, in a clean clone. When Go is down or at its limit, fall back to `explorer` and `chore` (Claude Haiku) and `test-writer` (Claude Sonnet).
+Go models run through `task ai`, in a clean clone. When Go is down or a job's models are all at their limits, fall back to `explorer` and `chore` (Claude Haiku) and `test-writer` (Claude Sonnet).
 
 Claude only runs inside Claude Code. Never send a Claude subscription login through another tool, including jcode or OpenCode: Anthropic's terms forbid it.
 

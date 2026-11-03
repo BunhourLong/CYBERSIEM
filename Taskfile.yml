@@ -27,6 +27,11 @@ tasks:
       - task: check
       - git push -u origin HEAD
 
+  review:second:
+    desc: Get a second opinion from Codex on this branch's commits. SECOND_OPINION_MODEL picks the model
+    cmds:
+      - bash scripts/second_opinion.sh
+
   lint:
     desc: Fail on Python syntax errors and undefined names. T-001 widens this after its formatting commit
     cmds:

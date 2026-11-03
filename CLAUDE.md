@@ -55,6 +55,7 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 | Write edge and abuse tests | `test-writer` | Sonnet, medium |
 | Run tests, scans, eval; report failures | `test-runner` | Haiku, low |
 | Attack the change | `pentester` | Opus, medium; high for auth, enforcement, scoring, proxy or parsing |
+| Second opinion on high-risk diffs | `task review:second` (shell, clean clone) | Codex, on your ChatGPT login |
 | Mechanical chores: docs, renames, moves, version bumps | `chore` | Haiku, low |
 | Plan a phase, 🔒 decisions, a bug that survived 2 fix rounds | main session | Opus, only for that step |
 

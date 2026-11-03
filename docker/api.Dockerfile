@@ -1,5 +1,5 @@
 # ── Angular UI (frontend/) ───────────────────────────────────────────────────
-FROM node:24-slim AS frontend
+FROM node:25-slim AS frontend
 
 ENV NG_CLI_ANALYTICS=false
 

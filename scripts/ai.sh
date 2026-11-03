@@ -35,7 +35,18 @@ if [ -n "$(git -C "$repo" status --porcelain)" ]; then
 fi
 
 work="$(mktemp -d)"
-trap 'rm -rf "$work" ${config:+"$config"}' EXIT
+server=""
+surface=""
+cleanup() {
+  if [ -n "$surface" ]; then
+    # Keep a watched job readable for 10 minutes after it ends.
+    nohup bash -c 'sleep 600; cmux close-surface --surface "$1"; kill "$2"; rm -rf "$3"' _ "$surface" "$server" "$work" > /dev/null 2>&1 &
+    return
+  fi
+  [ -z "$server" ] || kill "$server" 2> /dev/null || true
+  rm -rf "$work"
+}
+trap cleanup EXIT
 git clone -q --depth 1 --no-tags "file://$repo" "$work/repo"
 
 # Prefer origin/main: a stale local main would widen the diff under review.
@@ -46,41 +57,37 @@ git -C "$repo" diff "$base...HEAD" > "$work/repo/REVIEW.diff"
 # Keep .git out of the job's reach: a written .git/config could run code when git reads it later.
 mv "$work/repo/.git" "$work/git"
 
-# AI_WATCH=1 runs the job in a new Warp tab so you can follow it, and waits for it here.
+# AI_WATCH=1 shows the job's real OpenCode interface in a new cmux split. Run from inside cmux.
 watch_job() {
-  local name="ai-$role-$$" waited=0
-  config="$HOME/.warp/tab_configs/$name.toml"
-  cp "$prompt_file" "$work/prompt"
-  {
-    printf 'work=%q events=%q errors=%q model=%q agent=%q\n' "$work" "$events" "$errors" "$model" "$agent"
-    cat <<'EOF'
-status=1
-trap 'echo "$status" > "$work/done"' EXIT
-touch "$work/started"
-OPENCODE_DISABLE_CLAUDE_CODE=1 opencode run --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$work/prompt")" \
-  2> "$errors" < /dev/null | tee "$events" | jq --unbuffered -r '
-    if .type == "text" then .part.text
-    elif .type == "tool_use" then "-> \(.part.tool) \(.part.state.input | tostring | .[0:120])"
-    elif .type == "error" then "ERROR: \(.error.data.message // .error.name)"
-    else empty end'
-status=${PIPESTATUS[0]}
-echo; echo "Job finished. You can close this tab."
-EOF
-  } > "$work/run.sh"
-  mkdir -p "$(dirname "$config")"
-  printf 'name = "%s"\n\n[[panes]]\nid = "job"\ntype = "terminal"\ndirectory = "%s"\ncommands = ["bash %s/run.sh"]\n' \
-    "$name" "$repo" "$work" > "$config"
-  open "warp://tab_config/$name"
-  until [ -s "$work/done" ]; do
+  local url="" session="" waited=0 job
+  openssl rand -hex 16 > "$work/password"
+  OPENCODE_SERVER_PASSWORD="$(cat "$work/password")"
+  export OPENCODE_SERVER_PASSWORD
+  # Start in the clone, so the server never treats the real repo as its project.
+  (cd "$work/repo" && OPENCODE_DISABLE_CLAUDE_CODE=1 exec opencode serve > "$work/serve.log" 2>&1 < /dev/null) &
+  server=$!
+  until [ -n "$url" ] || [ "$waited" -ge 30 ]; do
     sleep 1
     waited=$((waited + 1))
-    if [ "$waited" -ge 1800 ] || { [ "$waited" -ge 60 ] && [ ! -e "$work/started" ]; }; then
-      echo "The Warp tab didn't start or finish the job." >&2
-      status=1
-      return
-    fi
+    url="$(grep -oE 'http://127\.0\.0\.1:[0-9]+' "$work/serve.log" | head -n 1 || true)"
   done
-  status="$(cat "$work/done")"
+  [ -n "$url" ] || { echo "opencode serve didn't start." >&2; status=1; return; }
+
+  OPENCODE_DISABLE_CLAUDE_CODE=1 opencode run --attach "$url" --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
+    > "$events" 2> "$errors" < /dev/null &
+  job=$!
+  waited=0
+  until [ -n "$session" ] || ! kill -0 "$job" 2> /dev/null || [ "$waited" -ge 60 ]; do
+    sleep 1
+    waited=$((waited + 1))
+    session="$(head -n 1 "$events" | jq -r '.sessionID // empty' 2> /dev/null || true)"
+  done
+  if [ -n "$session" ]; then
+    surface="$(cmux new-split right --command "OPENCODE_SERVER_PASSWORD=\$(cat $work/password) opencode attach $url --dir $work/repo -s $session" 2> /dev/null \
+      | grep -oE 'surface:[0-9]+' | head -n 1 || true)"
+  fi
+  [ -n "$surface" ] || echo "Couldn't open a cmux split, so this job runs unseen." >&2
+  wait "$job" || status=$?
 }
 
 status=0

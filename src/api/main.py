@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import time
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from ipaddress import ip_address
 from math import ceil, isfinite
 from pathlib import Path
@@ -84,6 +85,7 @@ Limit = Annotated[int, Query(ge=1, le=1000)]
 Offset = Annotated[int, Query(ge=0, le=1_000_000)]
 Hours = Annotated[int, Query(ge=1, le=720)]
 MAX_MAP_SCAN_LIMIT = 2000
+INGEST_MAX_CLOCK_SKEW = timedelta(hours=1)  # caller-supplied timestamps must be this close to now
 
 # Known-bad SESSION_SECRET values that must be rejected in production
 _KNOWN_BAD_SECRETS = frozenset({"change-me", "change-me-in-production", "secret", "dev", ""})
@@ -617,7 +619,7 @@ async def _parse_payload(request: Request, model: type[_PayloadModel]) -> _Paylo
     try:
         return model.model_validate(raw_payload)
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors(include_url=False)) from exc
+        raise HTTPException(status_code=422, detail=exc.errors(include_url=False, include_input=False)) from exc
 
 
 @app.on_event("startup")
@@ -834,9 +836,23 @@ def list_blocked_ips(request: Request):
     return [_serialize_blocked_ip(record) for record in repository.list_blocked_ips()]
 
 
-# Temporary: unauthenticated, removed by T-003.
 @app.post("/ingest-event", response_model=IngestEventResponse, status_code=202)
-def ingest_event(payload: IngestEventRequest):
+async def ingest_event(request: Request):
+    # Shared-secret auth, read per request; empty counts as unset. Checked before the body is parsed.
+    expected = os.getenv("INGEST_TOKEN", "")
+    if not expected:
+        raise HTTPException(status_code=503, detail="Ingestion disabled")
+    scheme, _, supplied = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(supplied.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    payload = await _parse_payload(request, IngestEventRequest)
+    if payload.timestamp is not None:
+        try:
+            skew = abs(_normalize_timestamp(payload.timestamp) - datetime.now(timezone.utc))
+        except OverflowError:
+            skew = None
+        if skew is None or skew > INGEST_MAX_CLOCK_SKEW:
+            raise HTTPException(status_code=422, detail="timestamp out of range")
     event = _build_ingest_event(payload)
     alerts = security_engine.process_event(event)
     return IngestEventResponse(

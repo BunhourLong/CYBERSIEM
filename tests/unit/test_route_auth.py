@@ -17,7 +17,6 @@ PUBLIC = {
     ("GET", "/login"),  # UI shell
     ("GET", "/dashboard"),  # UI shell, data comes from guarded /api/ui/*
     ("GET", "/denied"),  # UI shell
-    ("POST", "/ingest-event"),  # temporary, removed by T-003
 }
 # Minimal body valid for every POST/PATCH route, so validation cannot hide a missing guard.
 BODY = {"ip": "203.0.113.7", "status": "safe", "action": "block"}
@@ -55,7 +54,9 @@ def _call(client, method, path, headers):
 
 
 @pytest.mark.parametrize("headers", [JSON, HTML], ids=["json", "html"])
-def test_every_route_requires_auth_unless_allowlisted(api_client, headers):
+def test_every_route_requires_auth_unless_allowlisted(api_client, headers, monkeypatch):
+    # With no INGEST_TOKEN the ingest route answers 503; set one so the walk sees the real 401.
+    monkeypatch.setenv("INGEST_TOKEN", "walk-token")
     for method, path in _routes():
         if (method, path) in PUBLIC or (headers is HTML and (method, path) in HTML_SHELL):
             continue
@@ -112,7 +113,8 @@ def test_query_bounds_return_422(readonly_client, url):
 def _guarded_routes():
     for route in api_routes():
         for method in route.methods - {"HEAD", "OPTIONS"}:
-            if (method, route.path) not in PUBLIC | HTML_SHELL:
+            # Ingest uses a shared token, not a session, so the role split does not apply to it.
+            if (method, route.path) not in PUBLIC | HTML_SHELL | {("POST", "/ingest-event")}:
                 yield method, route
 
 

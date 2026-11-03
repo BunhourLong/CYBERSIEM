@@ -44,6 +44,11 @@ http {
             return 301 /siem/login;
         }
 
+        # Ingestion is for trusted senders on the internal network only.
+        location ^~ /siem/ingest-event {
+            return 404;
+        }
+
         location /siem/ {
             # Strip the /siem prefix before forwarding to FastAPI.
             rewrite ^/siem/(.*)$ /$1 break;

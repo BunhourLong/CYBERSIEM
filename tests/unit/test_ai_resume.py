@@ -37,8 +37,9 @@ def _ai(tmp_path: Path, stub_dir: Path, stub_body: str, **env_extra: str) -> tup
     prompt = tmp_path / "prompt.md"
     prompt.write_text("do it")
 
-    env = {**os.environ, "PATH": f"{stub_dir}:{os.environ['PATH']}", **env_extra}
+    env = {**os.environ, "PATH": f"{stub_dir}:{os.environ['PATH']}"}
     env.pop("AI_WATCH", None)
+    env.update(env_extra)
     done = subprocess.run(  # noqa: S603  # our own script with a stub opencode
         [BASH, str(SCRIPT), "explore", str(prompt)], cwd=repo, env=env, capture_output=True, text=True, timeout=25
     )
@@ -96,3 +97,42 @@ def test_other_errors_are_not_retried(tmp_path):
     assert len(calls) == 1
     assert "Rate limit exceeded" in done.stderr
     assert len((repo / ".scan/ai-usage.tsv").read_text().splitlines()) == 1
+
+
+def test_text_about_tls_errors_is_not_a_dropped_connection(tmp_path):
+    # A job can read code or logs that mention these errors and still finish fine.
+    read = json.dumps({"type": "tool_use", "sessionID": "S1", "part": {"state": {"output": "EPROTO TLS handshake"}}})
+    done, calls, _ = _run(tmp_path, [f"{read}\n{TEXT}\n{STEP}", TEXT])
+    assert done.returncode == 0, done.stderr
+    assert len(calls) == 1
+
+
+def test_watched_job_resumes_when_only_the_saved_session_shows_the_drop(tmp_path):
+    # `run --attach` exits cleanly on a drop, so the error is only in the exported session.
+    failed = {"messages": [{"info": {"role": "assistant", "error": {"data": {"message": "EPROTO: TLS handshake"}}}}]}
+    finished = {
+        "messages": [
+            {"info": {"role": "assistant", "finish": "stop"}, "parts": [{"type": "text", "text": "done"}]},
+        ]
+    }
+    stub_dir = tmp_path / "bin"
+    stub_dir.mkdir()
+    (stub_dir / "cmux").write_text("#!/usr/bin/env bash\nexit 1\n")
+    (stub_dir / "cmux").chmod(0o755)
+    (stub_dir / "export0").write_text(json.dumps(failed))
+    (stub_dir / "export1").write_text(json.dumps(finished))
+    body = (
+        f'd="{stub_dir}"\n'
+        'case "$1" in\n'
+        "  serve) echo http://127.0.0.1:1; exec sleep 30 ;;\n"
+        '  export) cat "$d/export$(($(cat "$d/count") - 1))" ;;\n'
+        '  run) echo "$*" >> "$d/calls"; n="$(cat "$d/count" 2>/dev/null || echo 0)"; echo $((n + 1)) > "$d/count"\n'
+        f"      echo '{json.dumps({'type': 'step_start', 'sessionID': 'S1'})}' ;;\n"
+        "esac\n"
+    )
+    done, repo = _ai(tmp_path, stub_dir, body, AI_WATCH="1")
+    calls = (stub_dir / "calls").read_text().splitlines()
+    assert done.returncode == 0, done.stderr
+    assert len(calls) == 2
+    assert "-s S1" in calls[1] and calls[1].endswith("continue")
+    assert (repo / ".scan/ai-explore.txt").read_text().strip() == "done"

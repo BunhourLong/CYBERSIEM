@@ -97,7 +97,7 @@ watch_job() {
 
 load_session() {
   local waited=0
-  until session_finished || [ "$waited" -ge 120 ]; do
+  until session_finished || jq -e '.messages[-1].info.error != null' "$work/session.json" > /dev/null 2>&1 || [ "$waited" -ge 120 ]; do
     sleep 1
     waited=$((waited + 1))
   done
@@ -116,6 +116,17 @@ session_finished() {
 # At Go's usage limit opencode logs the error and never exits. An alarm survives exec, so it stops opencode itself.
 opencode_run() {
   OPENCODE_DISABLE_CLAUDE_CODE=1 perl -e 'alarm shift; exec @ARGV or die' "${AI_TIMEOUT:-900}" opencode run "$@"
+}
+
+# Only real error fields count: a job's own output can mention these errors, such as when it reads this script.
+connection_dropped() {
+  local found
+  found="$({
+    jq -r 'select(.type=="error") | .error.data.message // .error.name' "$events"
+    jq -r '.messages[-1].info.error | .data.message // .name // empty' "$work/session.json"
+    cat "$errors"
+  } 2> /dev/null || true)"
+  grep -qE 'EPROTO|ECONNRESET|TLS handshake' <<< "$found"
 }
 
 record_usage() {
@@ -137,20 +148,21 @@ fi
 
 # A dropped connection says nothing about the answer, so resume the same session instead of failing the job.
 resumes=0
-while [ "$resumes" -lt 3 ] && grep -qE 'EPROTO|ECONNRESET|TLS handshake' "$events" "$errors" 2> /dev/null; do
-  session="$(jq -r '.sessionID // empty' "$events" 2> /dev/null | head -n 1 || true)"
+while [ "$resumes" -lt 3 ] && connection_dropped; do
+  session="${session:-$(jq -r '.sessionID // empty' "$events" 2> /dev/null | head -n 1 || true)}"
   [ -n "$session" ] || break
-  record_usage
+  # A watched job's saved session already holds every step, so counting here too would double them.
+  [ -n "$url" ] || record_usage
   resumes=$((resumes + 1))
   echo "Connection dropped, resuming session (try $resumes of 3)." >&2
   status=0
   opencode_run ${url:+--attach "$url"} --dir "$work/repo" -m "$model" --agent "$agent" -s "$session" --format json continue \
     > "$events" 2> "$errors" < /dev/null || status=$?
+  # `run --attach` can exit before the last events arrive, so a watched job reads the saved session again.
+  if [ -n "$url" ] && [ "$status" -eq 0 ]; then
+    load_session
+  fi
 done
-# `run --attach` can exit before the last events arrive, so a resumed watched job also reads the saved session.
-if [ -n "$url" ] && [ "$resumes" -gt 0 ] && [ "$status" -eq 0 ] && ! grep -q '"type":"error"' "$events"; then
-  load_session
-fi
 
 record_usage
 if [ "$status" -eq 142 ]; then

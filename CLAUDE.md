@@ -9,9 +9,9 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 - `docker/` is the local stack. `stack/` is the deployment stack and also needs `../../bookmark-publisher`.
 
 ## Commands (run from repo root)
-- `task check`: lint + frontend tests + build; Python tests join in T-001 (must pass before staging).
+- `task check`: lint + Python tests + frontend tests + build (must pass before staging).
 - `task security`: secrets, Semgrep rules, workflows, dependencies, Dockerfiles, NGINX config, images. `task security:<name>` runs one. CI runs each, plus CodeQL.
-- From T-001: `task test -- tests/unit/test_x.py`. From T-007: `task eval` (detection corpus).
+- `task test -- tests/unit/test_x.py`. From T-007: `task eval` (detection corpus).
 - Prefer scoped commands while iterating.
 
 ## Invariants (never break)

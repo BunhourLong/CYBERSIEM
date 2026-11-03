@@ -7,15 +7,16 @@ vars:
   GIXY: gixy-next==0.9.0
   HADOLINT: ghcr.io/hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
   OSV: ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0
-  RUFF: ruff@0.17.3
+  PY: src scripts tests main.py
   SEMGREP: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
   ZIZMOR: ghcr.io/zizmorcore/zizmor:1.31.1@sha256:42d409dbb851d4c5d35a058cf042b828bea1e3f2884378c526eb0974780e18d9
 
 tasks:
   check:
-    desc: 'The gate: Python lint (tests join in T-001), frontend tests and production build'
+    desc: 'The gate: Python lint and tests, frontend tests and production build'
     cmds:
       - task: lint
+      - task: test
       - task: frontend
 
   ship:
@@ -38,9 +39,23 @@ tasks:
       - bash scripts/brief.sh task {{.CLI_ARGS}}
 
   lint:
-    desc: Fail on Python syntax errors and undefined names. T-001 widens this after its formatting commit
+    desc: 'Python lint with security rules, and Python formatting'
     cmds:
-      - uvx --python 3.12 {{.RUFF}} check --select E9,F63,F7,F82 src scripts
+      - uv run --locked ruff check {{.PY}}
+      - uv run --locked ruff format --check {{.PY}}
+
+  test:
+    desc: 'Run the Python tests: task test -- tests/unit/test_x.py'
+    cmds:
+      - uv run --locked pytest {{.CLI_ARGS}}
+
+  fmt:
+    desc: Format Python and frontend code
+    deps: ['frontend:install']
+    cmds:
+      - uv run --locked ruff check --fix {{.PY}}
+      - uv run --locked ruff format {{.PY}}
+      - cd frontend && npx prettier --write src
 
   frontend:install:
     internal: true
@@ -51,10 +66,11 @@ tasks:
       - npm ci --no-audit --no-fund
 
   frontend:
-    desc: Run the Angular tests and prove the production build works
+    desc: Check formatting, run the Angular tests and prove the production build works
     dir: frontend
     deps: ['frontend:install']
     cmds:
+      - npx prettier --check src
       - npx ng test --watch=false
       - npm run build
 
@@ -93,10 +109,7 @@ tasks:
   security:deps:
     desc: Fail on a known vulnerability in any Python or npm dependency
     cmds:
-      - mkdir -p .scan
-      # shortcut: requirements.txt has no pins, so resolve it first. T-001 replaces this with uv.lock.
-      - uv pip compile requirements.txt --python-version 3.12 --quiet --output-file .scan/requirements.txt
-      - docker run --rm -v "$PWD:/repo:ro" {{.OSV}} scan source -L /repo/.scan/requirements.txt -L /repo/frontend/package-lock.json
+      - docker run --rm -v "$PWD:/repo:ro" {{.OSV}} scan source -L /repo/uv.lock -L /repo/frontend/package-lock.json
 
   security:infra:
     desc: Lint the Dockerfiles and the rendered NGINX config

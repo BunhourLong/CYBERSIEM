@@ -1,5 +1,7 @@
 {
   "autoMemoryEnabled": false,
+  "model": "opus",
+  "effortLevel": "high",
   "permissions": {
     "allow": [
       "Bash(task *)",

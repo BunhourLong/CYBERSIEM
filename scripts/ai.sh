@@ -9,7 +9,7 @@ prompt_file="${2:-}"
 case "$role" in
   explore) agent=reader; model=opencode-go/deepseek-v4.1-flash ;;
   write)   agent=writer; model=opencode-go/deepseek-v4.1-flash ;;
-  tests)   agent=writer; model=opencode-go/claude-haiku-5-5 ;;
+  tests)   agent=writer; model=opencode-go/glm-5.2 ;;
   review)  agent=reader; model=opencode-go/gemini-4-argon ;;
   *) echo "Usage: scripts/ai.sh <explore|write|tests|review> <prompt-file>" >&2; exit 2 ;;
 esac

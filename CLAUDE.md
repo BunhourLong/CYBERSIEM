@@ -50,20 +50,21 @@ Provisional until T-052 tests the OpenCode Go models on this repo. Details: plan
 
 | Step | Low risk | High risk (auth, enforcement, scoring, client IP, proxy, parsing, audit) |
 |---|---|---|
-| Orchestrate, judge findings | Claude Sonnet, main session | same |
+| Orchestrate, plan, judge findings | Claude Opus 5.5, high effort, main session | same |
 | Find code, chores | Go: DeepSeek V4.1 Flash | same |
 | Write code, apply fixes | Go: DeepSeek V4.1 Flash | Claude Sonnet, `implementer` |
 | Review the diff | Claude Sonnet, `reviewer` | same, plus Go: Gemini 4 Argon |
-| Write tests | Go: Haiku 5.5 | Claude Sonnet, `test-writer` |
+| Write tests | Go: GLM-5.2 | same |
 | Run tests, scans, eval | No model: `task brief` | same |
 | Attack the change | Go: Gemini 4 Argon | Claude Opus, `pentester` |
-| Plan a phase, 🔒 decisions, a bug that survived 2 fix rounds | Claude Opus, main session, only for that step | same |
 
-Go models run through `task ai`, in a clean clone. `explorer` and `chore` (Claude Haiku) are the fallback when Go is down or at its limit.
+Go models run through `task ai`, in a clean clone. When Go is down or at its limit, fall back to `explorer` and `chore` (Claude Haiku) and `test-writer` (Claude Sonnet).
+
+Claude only runs inside Claude Code. Never send a Claude subscription login through another tool, including jcode or OpenCode: Anthropic's terms forbid it.
 
 ## Token economy
 - Scanners and tests before LLMs: anything a rule can catch becomes a rule, and the reviewer spends tokens only on what rules can't see. A passing test run costs no model tokens.
-- Cheap models write, strong models judge. Claude's limit goes to orchestrating, reviewing and high-risk work; volume goes to Go Flash models.
+- Cheap models write, strong models judge. Claude's limit goes to orchestrating, reviewing and high-risk work; volume goes to Go Flash models. The orchestrator is the most expensive seat, so it delegates and keeps its own context small.
 - Every OpenCode run starts with about 3k tokens of overhead, so ask for one job per run, not many small ones. Premium Go models get only the reviews that need them.
 - Workers start with no history. Give each a path or a short brief and a capped reply. Resume a Claude agent with `SendMessage` rather than starting a new one for a fix.
 - Read with line ranges. `src/api/main.py` and `src/security_engine/repository.py` are large: grep first.

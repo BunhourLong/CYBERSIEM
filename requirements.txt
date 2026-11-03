@@ -1,4 +1,4 @@
-scapy>=2.5.0
+scapy>=2.8.0
 pymongo>=4.6.0
 streamlit>=1.32.0
 plotly>=5.20.0

@@ -65,7 +65,7 @@ def test_force_unblock_override_bypasses_alert_hold(make_alert_row):
     assert evaluation.reputation_reasons == ["force_unblock_override"]
 
 
-def test_manual_block_override_blocks_with_manual_reason(make_alert_row):
+def test_manual_block_override_blocks_with_manual_reason():
     previous = IPReputationRecord(ip=IP, analyst_override="manual_block")
 
     evaluation = evaluate_ip_reputation(IP, [], previous, now=NOW)
@@ -92,7 +92,7 @@ def test_alert_hold_blocks_and_clears_block_timer(make_alert_row):
     assert evaluation.reputation_reasons == ["alert_hold"]
 
 
-def test_block_window_keeps_ip_blocked_until_expiry(make_alert_row):
+def test_block_window_keeps_ip_blocked_until_expiry():
     block_until = NOW + timedelta(seconds=600)
     previous = IPReputationRecord(ip=IP, current_state="blocked", blocked_until=block_until)
 
@@ -115,14 +115,58 @@ def test_cooldown_throttles_repeated_medium_alerts(make_alert_row):
     assert evaluation.reputation_reasons == ["cooldown_active"]
 
 
-def test_direct_critical_branch_is_shadowed_by_alert_hold(make_alert_row):
-    # A high-severity payload alert always sets the alert hold, which is checked first,
-    # so the direct-critical branch never sets its own reason or block timer.
-    evaluation = evaluate_ip_reputation(IP, [make_alert_row()], now=NOW)
+def test_direct_critical_alert_blocks_with_block_timer_when_status_skips_alert_hold(make_alert_row):
+    # Real rows can't reach this today: only unresolved, safe and malicious statuses exist.
+    evaluation = evaluate_ip_reputation(IP, [make_alert_row(status="reviewing")], now=NOW)
 
+    assert evaluation.current_state == "blocked"
+    assert evaluation.blocked_reason == "direct_critical_alert"
+    assert evaluation.blocked_until == NOW + timedelta(seconds=ReputationConfig().block_duration_seconds)
+    assert evaluation.reputation_reasons == ["direct_critical_alert"]
+
+
+def test_suppress_auto_block_during_cooldown_throttles_with_both_reasons(make_alert_row):
+    rows = _path_probe_rows(make_alert_row, [120, 60, 0])
+    previous = IPReputationRecord(
+        ip=IP,
+        analyst_override="suppress_auto_block",
+        cooldown_until=NOW + timedelta(seconds=1800),
+    )
+
+    evaluation = evaluate_ip_reputation(IP, rows, previous, now=NOW, config=_path_probe_config())
+
+    assert evaluation.current_state == "throttled"
+    assert evaluation.blocked_reason is None
+    assert evaluation.reputation_reasons == ["cooldown_active", "temporary_auto_block_suppression"]
+
+
+def test_no_alerts_and_no_previous_record_is_trusted_with_no_reasons():
+    evaluation = evaluate_ip_reputation(IP, [], now=NOW)
+
+    assert evaluation.current_state == "trusted"
+    assert evaluation.blocked_reason is None
+    assert evaluation.reputation_reasons == []
+
+
+def test_malicious_alert_adds_active_malicious_reason_after_alert_hold(make_alert_row):
+    evaluation = evaluate_ip_reputation(IP, [make_alert_row(status="malicious")], now=NOW)
+
+    assert evaluation.current_state == "blocked"
     assert evaluation.blocked_reason == "alert_hold"
-    assert evaluation.blocked_until is None
-    assert "direct_critical_alert" not in evaluation.reputation_reasons
+    assert evaluation.reputation_reasons == ["alert_hold", "active_malicious_alerts"]
+
+
+def test_whitelisted_ip_with_sustained_score_stays_trusted_and_reports_threshold(make_alert_row):
+    rows = _path_probe_rows(make_alert_row, [240, 180, 120, 60, 0])
+    previous = IPReputationRecord(ip=IP, whitelist=True)
+    config = _path_probe_config(repeated_medium_min_weight=50.0)
+
+    evaluation = evaluate_ip_reputation(IP, rows, previous, now=NOW, config=config)
+
+    assert evaluation.current_score == pytest.approx(76.8)
+    assert evaluation.current_state == "trusted"
+    assert evaluation.blocked_reason is None
+    assert evaluation.reputation_reasons == ["analyst_trusted_ip", "score_at_block_threshold"]
 
 
 def test_three_medium_alerts_in_window_block_as_repeated_medium(make_alert_row):

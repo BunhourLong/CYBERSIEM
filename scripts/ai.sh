@@ -64,6 +64,7 @@ watch_job() {
   # Start in the clone, so the server never treats the real repo as its project.
   (cd "$work/repo" && OPENCODE_DISABLE_CLAUDE_CODE=1 exec opencode serve > "$work/serve.log" 2>&1 < /dev/null) &
   server=$!
+  disown "$server"
   until [ -n "$url" ] || [ "$waited" -ge 30 ]; do
     sleep 1
     waited=$((waited + 1))
@@ -82,7 +83,7 @@ watch_job() {
   done
   if [ -n "$session" ]; then
     surface="$(cmux new-split right --command "OPENCODE_SERVER_PASSWORD=\$(cat $work/password) opencode attach $url --dir $work/repo -s $session" 2> /dev/null \
-      | grep -oE 'surface:[0-9]+' | head -n 1 || true)"
+      | grep -oE '^OK surface:[0-9]+' | cut -d ' ' -f 2 || true)"
   fi
   [ -n "$surface" ] || echo "Couldn't open a cmux split, so this job runs unseen." >&2
   wait "$job" || status=$?

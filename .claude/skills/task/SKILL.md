@@ -43,7 +43,7 @@ Prompt files go in `.scan/` (ignored). Inside cmux, prefix `AI_WATCH=1` so the j
 Never push with an open High pentest finding, a failing required check, or a skipped review. Never force-push or rewrite history.
 
 ## Then
-Take the next task on a fresh branch. After 3 tasks, or when context passes about 40%, stop, name the next task and tell me to run /clear. Also stop on a 🔒 with nothing else unblocked, a failed fix round, or a change you'd want me to look at first.
+Stop after every task, once it's landed or blocked. Summarize it, name the next task, and tell me to start a fresh session: `/clear`, then `/task`. Don't start the next task, even if it looks small. Also stop on a 🔒 with nothing else unblocked, a failed fix round, or a change you'd want me to look at first.
 
 ## Plan a phase
 1. Run the previous phase's exit criteria from plan.md §5. If any fails, report it and stop.

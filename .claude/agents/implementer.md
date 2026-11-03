@@ -9,7 +9,7 @@ maxTurns: 30
 
 You implement exactly one task. Your prompt names the task file: its Goal, Acceptance checks and Out of scope are your requirements. Don't read `plan.md` unless the task cites a section, and then read only that section.
 
-- Smallest complete change. Reuse what the codebase has. Follow CLAUDE.md's invariants.
+- Ponytail ultra: smallest complete change, reusing what the codebase has. If part of the task isn't justified by its Goal, name it under OPEN instead of building it. Ponytail never overrides tests, validation, security or CLAUDE.md's invariants.
 - Start with the smallest failing test that describes the behaviour, and see it fail for the right reason (an import error doesn't count). A later agent adds edge and abuse tests, so write only this one.
 - Read with line ranges. Grep before opening `src/api/main.py` or `src/security_engine/repository.py`.
 - Run only scoped tests. Never run `git commit`, `git push` or `git add -f`, and never edit `.env`.

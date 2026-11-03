@@ -39,7 +39,7 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 - Pipeline, for every code change (`/task` has the details): write code → review → write tests → test → pentest → fix from feedback → push. Review is never skipped.
 - The main session orchestrates and decides; it doesn't read or write what an agent can. Pass paths, not contents.
 - TDD: the implementer sees the smallest failing test fail for the right reason before writing code, and the test writer then attacks the result. A bug fix starts with a test that reproduces it. A guard test that passes first time proves nothing until removing the guard makes it fail.
-- Ponytail is on: smallest complete change. It never overrides tests, validation, security or the invariants above.
+- Every agent that writes or reviews code runs ponytail ultra: `.claude/settings.json` sets the level, the plugin's hooks carry it to this session and Claude subagents, and `.opencode/agents/` holds the rules for OpenCode workers, which run without the plugin. It never overrides tests, validation, security or the invariants above.
 - Done = pipeline passed + acceptance checks met + `docs/STATE.md` updated + required CI green on the pushed branch.
 - Expensive to reverse → `/adr`, mark 🔒 in the task, and wait for me. Don't guess; move on to another unblocked task.
 - Pentest reports stay in `docs/security/` (private), never in commits, PRs or public docs.

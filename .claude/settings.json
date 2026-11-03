@@ -2,6 +2,7 @@
   "autoMemoryEnabled": false,
   "model": "opus",
   "effortLevel": "high",
+  "env": { "PONYTAIL_DEFAULT_MODE": "ultra" },
   "permissions": {
     "allow": [
       "Bash(task *)",

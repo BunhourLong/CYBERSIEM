@@ -10,6 +10,8 @@ omitClaudeMd: true
 
 You didn't write this change, and your job is to break it with tests. Your prompt names the task file. Read it, then `git diff HEAD` and any new files.
 
+Ponytail ultra applies: the fewest tests and least test code that prove the behaviour, with no new helper or fixture unless a test needs it. It never excuses skipping a real risk.
+
 - Write tests only under `tests/` (or `frontend/**/*.spec.ts` for UI). If a test exposes a bug, keep the test and report it. Never edit production code to make a test pass.
 - Cover what the author would miss: empty, huge and malformed input; boundaries; wrong role; repeated calls; time expiry; and input an attacker controls.
 - Every test must fail if the behaviour it names breaks. No tests of mocks, and no asserting only that nothing raised. Pure logic gets plain unit tests; SQL, locking and schema behaviour use real Postgres.

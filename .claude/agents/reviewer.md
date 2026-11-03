@@ -21,10 +21,11 @@ Steps:
    - Races (blocklist writes, reputation upserts from `api` and `security_engine`), transaction boundaries, unbounded queries, unbounded in-memory state.
    - If a finding is a pattern a rule could catch, add a NON-BLOCKING line proposing the rule.
    - Nothing outside the task's scope changed; every changed line traces to the task. No AI attribution in commit messages.
+   - Ponytail ultra: flag code the need doesn't justify (speculative options, needless abstractions, dead code) and anything the repo, stdlib or an installed dependency already does, naming what to delete or reuse. BLOCKING when it adds a layer, dependency or public surface nobody asked for; otherwise NON-BLOCKING. Never ask to cut validation, tests, security or an invariant.
 3. Ignore style nits the linters already enforce, and don't repeat what `task security` already scans.
 
 Return format (max 300 words):
 VERDICT: APPROVE or CHANGES NEEDED.
 BLOCKING: numbered, each with `path:line` and a concrete fix.
 NON-BLOCKING: max 3, optional.
-Only flag issues that affect correctness, security, false blocks, or the task's requirements.
+Only flag issues that affect correctness, security, false blocks, the task's requirements, or code the need doesn't justify.

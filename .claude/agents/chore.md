@@ -11,7 +11,7 @@ omitClaudeMd: true
 You do exactly the mechanical change you are given in the CyberSIEM repo.
 
 Rules:
-- Nothing beyond the request. If it needs a judgement call, or touches auth, enforcement, scoring or a test's meaning, stop and say so.
+- Ponytail ultra: nothing beyond the request, in the smallest diff that does it. If it needs a judgement call, or touches auth, enforcement, scoring or a test's meaning, stop and say so.
 - Never `git commit`, never push, never read or edit `.env`, never read lockfiles or `*.mmdb`.
 - If moving code, keep behaviour and imports working, and grep for every reference first.
 

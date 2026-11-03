@@ -43,6 +43,9 @@ base=main
 git -C "$repo" show-ref --verify -q refs/remotes/origin/main && base=origin/main
 git -C "$repo" diff "$base...HEAD" > "$work/repo/REVIEW.diff"
 
+# Keep .git out of the job's reach: a written .git/config could run code when git reads it later.
+mv "$work/repo/.git" "$work/git"
+
 status=0
 # Claude config on this machine is private and adds tokens, so OpenCode shouldn't load it.
 OPENCODE_DISABLE_CLAUDE_CODE=1 opencode run --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
@@ -63,22 +66,23 @@ jq -r --arg role "$role" --arg model "$model" \
 
 if [ "$agent" = writer ]; then
   rm -f "$work/repo/REVIEW.diff"
-  git -C "$work/repo" add -A
-  changed="$(git -C "$work/repo" diff --cached --no-renames --name-only)"
+  clone_git() { git --git-dir="$work/git" --work-tree="$work/repo" -c core.quotePath=false "$@"; }
+  clone_git add -A
+  changed="$(clone_git diff --cached --no-renames --name-only)"
 
   # Permission rules only cover the edit tool, so check what actually changed before applying it.
-  if printf '%s\n' "$changed" | grep -qE '^(\.github|\.claude|\.opencode|scripts)/|^(Taskfile\.yml|opencode\.json|CLAUDE\.md)$|(^|/)\.env|\.mmdb$'; then
+  if grep -qE '^(\.github|\.claude|\.opencode|scripts)/|^(Taskfile\.yml|opencode\.json|CLAUDE\.md)$|(^|/)\.env|\.mmdb$' <<< "$changed"; then
     echo "Refused: the job changed a protected path:" >&2
     printf '%s\n' "$changed" >&2
     exit 1
   fi
-  if [ "$role" = tests ] && printf '%s\n' "$changed" | grep -vE '^tests/|\.spec\.ts$' | grep -q .; then
+  if [ "$role" = tests ] && [ -n "$changed" ] && grep -qvE '^tests/|\.spec\.ts$' <<< "$changed"; then
     echo "Refused: a test job changed non-test files:" >&2
     printf '%s\n' "$changed" >&2
     exit 1
   fi
 
-  git -C "$work/repo" diff --cached --no-renames --binary > "$patch"
+  clone_git diff --cached --no-renames --binary > "$patch"
   [ ! -s "$patch" ] || git -C "$repo" apply "$patch"
 fi
 

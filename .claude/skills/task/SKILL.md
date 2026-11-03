@@ -25,7 +25,7 @@ You orchestrate and decide. Workers do the work. Stay cheap: give workers paths 
 | Run tests | `task brief -- check` | same |
 | Pentest | `task ai -- review` with an attacker prompt, for code changes | `pentester` (Claude Opus, `effort: high`) |
 
-Prompt files go in `.scan/` (ignored). `task ai` sees only committed code, so commit your work on the task branch before each call. It applies a writer's patch to your working tree: read the diff before committing it. Keep a prompt under 200 words, and state its word limit. Never paste `docs/security/` or customer data into one. If a Go model fails or hits a limit, retry once with `AI_MODEL`, then fall back to the Claude agents `explorer`, `chore` or `implementer`.
+Prompt files go in `.scan/` (ignored). `task ai` sees only committed code, so commit your work on the task branch before each call. For a review, tell it to read `REVIEW.diff`. Go writers can't run commands. `task ai` applies their patch to your working tree, and **you must read that diff before running tests**, because tests execute whatever was written. Keep a prompt under 200 words, and state its word limit. Never paste `docs/security/` or customer data into one. If a Go model fails or hits a limit, retry once with `AI_MODEL`, then fall back to the Claude agents `explorer`, `chore` or `implementer`.
 
 ## Pipeline
 1. **Load.** Read the task file. `rg --no-ignore -l '<module>' docs/tasks`, then read only those files' "Learned" sections. If a 🔒 item is undecided, record it in `docs/STATE.md` and skip to the next unblocked task; stop if there's none. Don't guess a 🔒 decision.

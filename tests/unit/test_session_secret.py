@@ -123,6 +123,15 @@ def test_non_utf8_json_body_is_422(api_client):
     assert response.status_code == 422
 
 
+def test_deeply_nested_json_body_is_422(api_client):
+    response = api_client.post(
+        "/login",
+        content="[" * 100000,
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 422
+
+
 def test_percent_encoded_nul_in_form_username_is_422_and_repository_untouched(api_client, fake_repository):
     response = api_client.post(
         "/login",

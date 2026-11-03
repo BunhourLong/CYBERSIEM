@@ -610,7 +610,7 @@ async def _parse_payload(request: Request, model: type[_PayloadModel]) -> _Paylo
     if "application/json" in content_type:
         try:
             raw_payload = await request.json()
-        except ValueError as exc:
+        except (ValueError, RecursionError) as exc:
             raise HTTPException(status_code=422, detail="Invalid JSON payload") from exc
     else:
         try:

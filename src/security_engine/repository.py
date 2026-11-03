@@ -1105,7 +1105,7 @@ class SecurityRepository:
                         (actor, action, target, source_ip),
                     )
                 conn.commit()
-        except Exception:  # noqa: BLE001, S110
+        except Exception:  # noqa: BLE001, S110 — audit failures must never break the caller
             pass
 
     def list_audit_events(self, limit: int = 100) -> list[dict]:

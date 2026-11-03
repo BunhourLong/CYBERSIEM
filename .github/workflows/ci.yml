@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  # Every branch: task branches are checked before they land on main.
+  push:
+  pull_request:
+  schedule:
+    # Weekly, so a vulnerability published while nobody is pushing still fails a run.
+    - cron: "23 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Includes the event so a push can't cancel the weekly scan.
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Actions are pinned to commit SHAs because tags can be moved. Dependabot updates them.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # Same major as docker/api.Dockerfile.
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
+        with:
+          version: 3.54.0
+      - run: task check
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      # One red scanner shouldn't hide what the others found.
+      fail-fast: false
+      matrix:
+        scan: [secrets, rules, code, workflows, deps, infra, images]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # gitleaks scans the whole history.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
+        with:
+          version: 3.54.0
+      - run: task security:${{ matrix.scan }}

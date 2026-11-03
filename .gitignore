@@ -57,7 +57,22 @@ tests/qa/
 *.xml
 *.gnmap
 *.nmap
-.wolf/
-.claude/*
-!.claude/rules/
-!.claude/rules/openwolf.md
+
+# =========================
+# Claude Code (shared config in .claude/ is tracked)
+# =========================
+.claude/settings.local.json
+.claude/worktrees/
+
+# =========================
+# Python tooling
+# =========================
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# =========================
+# Task and scanner working files
+# =========================
+.task/
+.scan/

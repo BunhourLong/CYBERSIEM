@@ -1,0 +1,9 @@
+rules:
+  - id: no-html-binding
+    languages: [generic]
+    severity: ERROR
+    message: Alert fields hold attacker-controlled text. Use interpolation, which Angular escapes, instead of binding HTML.
+    paths:
+      include:
+        - "*.html"
+    pattern-regex: '\[(innerHTML|outerHTML|srcdoc)\]\s*='

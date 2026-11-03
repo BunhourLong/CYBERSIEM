@@ -1,0 +1,109 @@
+# Needs Task 3, uv, Node 24 and Docker. Scanners are pinned here and run from pinned images, so nothing else needs installing.
+# Tags can be moved: Trivy's and KICS's were in 2026. Every image below is pinned by digest, so bump version and digest together.
+version: '3'
+
+vars:
+  GITLEAKS: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  GIXY: gixy-next==0.9.0
+  HADOLINT: ghcr.io/hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
+  OSV: ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0
+  RUFF: ruff@0.17.3
+  SEMGREP: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
+  ZIZMOR: ghcr.io/zizmorcore/zizmor:1.31.1@sha256:42d409dbb851d4c5d35a058cf042b828bea1e3f2884378c526eb0974780e18d9
+
+tasks:
+  check:
+    desc: 'The gate: Python lint (tests join in T-001), frontend tests and production build'
+    cmds:
+      - task: lint
+      - task: frontend
+
+  ship:
+    desc: Run the gate, then push this task branch. CI takes it from there
+    preconditions:
+      - sh: test "$(git branch --show-current)" != main
+        msg: Ship from a task branch, not main.
+    cmds:
+      - task: check
+      - git push -u origin HEAD
+
+  lint:
+    desc: Fail on Python syntax errors and undefined names. T-001 widens this after its formatting commit
+    cmds:
+      - uvx --python 3.12 {{.RUFF}} check --select E9,F63,F7,F82 src scripts
+
+  frontend:install:
+    internal: true
+    dir: frontend
+    sources: [package-lock.json]
+    generates: [node_modules/.package-lock.json]
+    cmds:
+      - npm ci --no-audit --no-fund
+
+  frontend:
+    desc: Run the Angular tests and prove the production build works
+    dir: frontend
+    deps: ['frontend:install']
+    cmds:
+      - npx ng test --watch=false
+      - npm run build
+
+  security:
+    desc: Run every scanner, in the same order as CI's jobs
+    cmds:
+      - task: security:secrets
+      - task: security:rules
+      - task: security:code
+      - task: security:workflows
+      - task: security:deps
+      - task: security:infra
+      - task: security:images
+
+  security:secrets:
+    desc: Scan the whole git history for secrets, with values redacted from the output
+    cmds:
+      # safe.directory: the mount's owner differs from the container user, and git refuses that otherwise.
+      - docker run --rm -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' -v "$PWD:/repo:ro" {{.GITLEAKS}} git --no-banner --redact /repo
+
+  security:rules:
+    desc: Test the custom Semgrep rules against their fixtures
+    cmds:
+      - docker run --rm -v "$PWD/.semgrep:/src:ro" {{.SEMGREP}} semgrep --test --metrics=off --disable-version-check --config /src /src
+
+  security:code:
+    desc: Scan the code with our own invariants. CodeQL handles generic taint analysis in CI
+    cmds:
+      - docker run --rm -v "$PWD:/src:ro" {{.SEMGREP}} semgrep scan --metrics=off --disable-version-check --error --config /src/.semgrep --exclude .semgrep /src
+
+  security:workflows:
+    desc: Lint the GitHub Actions workflows for unsafe patterns
+    cmds:
+      - docker run --rm -v "$PWD:/repo:ro" {{.ZIZMOR}} --offline /repo/.github/workflows
+
+  security:deps:
+    desc: Fail on a known vulnerability in any Python or npm dependency
+    cmds:
+      - mkdir -p .scan
+      # shortcut: requirements.txt has no pins, so resolve it first. T-001 replaces this with uv.lock.
+      - uv pip compile requirements.txt --python-version 3.12 --quiet --output-file .scan/requirements.txt
+      - docker run --rm -v "$PWD:/repo:ro" {{.OSV}} scan source -L /repo/.scan/requirements.txt -L /repo/frontend/package-lock.json
+
+  security:infra:
+    desc: Lint the Dockerfiles and the rendered NGINX config
+    cmds:
+      - mkdir -p .scan
+      - for f in docker/api.Dockerfile docker/security_engine.Dockerfile; do docker run --rm -i {{.HADOLINT}} hadolint --failure-threshold warning - < "$f" || exit 1; done
+      - sed 's/${NGINX_HOST}/example.test/' stack/nginx/nginx.conf.template > .scan/nginx.conf
+      - uvx --python 3.12 --from {{.GIXY}} gixy -f text -ll .scan/nginx.conf
+      - uvx --python 3.12 --from {{.GIXY}} gixy -f text -ll docker/nginx/nginx.conf
+
+  security:images:
+    desc: Build both images and fail on known vulnerabilities in their OS or language packages
+    cmds:
+      - mkdir -p .scan
+      - docker build -q -f docker/api.Dockerfile -t cybersiem-api:scan .
+      - docker build -q -f docker/security_engine.Dockerfile -t cybersiem-engine:scan .
+      - docker save cybersiem-api:scan -o .scan/api.tar
+      - docker save cybersiem-engine:scan -o .scan/engine.tar
+      - docker run --rm -v "$PWD/.scan:/scan:ro" {{.OSV}} scan image --archive /scan/api.tar
+      - docker run --rm -v "$PWD/.scan:/scan:ro" {{.OSV}} scan image --archive /scan/engine.tar

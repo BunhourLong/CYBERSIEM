@@ -1,0 +1,16 @@
+rules:
+  - id: no-raw-html-sink
+    languages: [typescript]
+    severity: ERROR
+    message: Alert fields hold attacker-controlled text. Build DOM nodes with textContent, as attack-map.ts does.
+    pattern-either:
+      - pattern: $X.innerHTML = $Y
+      - pattern: $X.outerHTML = $Y
+      - pattern: $X.insertAdjacentHTML(...)
+      - pattern: document.write(...)
+      - pattern: $X.bindPopup("...")
+      - pattern: $S.bypassSecurityTrustHtml(...)
+      - pattern: $S.bypassSecurityTrustScript(...)
+      - pattern: $S.bypassSecurityTrustUrl(...)
+      - pattern: $S.bypassSecurityTrustResourceUrl(...)
+      - pattern: $S.bypassSecurityTrustStyle(...)

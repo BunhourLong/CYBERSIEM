@@ -25,6 +25,7 @@ from src.api.auth import (
     create_session_cookie,
     get_current_user,
     hash_password,
+    load_session_secret,
     validate_password,
     verify_password,
 )
@@ -57,6 +58,9 @@ from src.security_engine.engine import SecurityEngine
 from src.security_engine.intelligence import ASNResolver
 from src.security_engine.repository import SecurityRepository
 
+# Validate before the repository (or anything else) is constructed: fail closed at import.
+SESSION_SECRET = load_session_secret()
+
 # Interactive docs expose the full API surface: off unless explicitly enabled for local dev.
 _DOCS_ON = os.getenv("API_DOCS_ENABLED", "").lower() == "true"
 app = FastAPI(
@@ -87,9 +91,6 @@ Offset = Annotated[int, Query(ge=0, le=1_000_000)]
 Hours = Annotated[int, Query(ge=1, le=720)]
 MAX_MAP_SCAN_LIMIT = 2000
 INGEST_MAX_CLOCK_SKEW = timedelta(hours=1)  # caller-supplied timestamps must be this close to now
-
-# Known-bad SESSION_SECRET values that must be rejected in production
-_KNOWN_BAD_SECRETS = frozenset({"change-me", "change-me-in-production", "secret", "dev", ""})
 
 _NO_CACHE_PATHS = frozenset({"/login"})
 _NO_CACHE_PREFIX = "/api/"
@@ -223,7 +224,7 @@ def _spa_index() -> Response:
 
 def _require_user(request: Request) -> tuple[UserSession | None, object]:
     """Any authenticated user, else 401. The Angular UI redirects to /login on 401."""
-    session = get_current_user(request, repository)
+    session = get_current_user(request, repository, SESSION_SECRET)
     if session is None:
         return None, JSONResponse({"detail": "Authentication required"}, status_code=401)
     return session, None
@@ -354,7 +355,7 @@ async def login(request: Request):
             status_code=429,
         )
 
-    secret = os.getenv("SESSION_SECRET", "change-me")
+    secret = SESSION_SECRET
     user = repository.get_user_by_username(username)
 
     # Always call verify_password to prevent username enumeration via timing side-channel.
@@ -393,7 +394,7 @@ async def login(request: Request):
 @app.post("/logout", status_code=204)
 @app.post("/api/auth/logout", status_code=204)
 def logout(request: Request):
-    session = get_current_user(request, repository)
+    session = get_current_user(request, repository, SESSION_SECRET)
     if session:
         _audit(session.username, "logout", None, request)
     secure_flag = os.getenv("SESSION_SECURE", "").lower() in ("1", "true", "yes")
@@ -613,7 +614,10 @@ async def _parse_payload(request: Request, model: type[_PayloadModel]) -> _Paylo
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Invalid JSON payload") from exc
     else:
-        body = (await request.body()).decode("utf-8")
+        try:
+            body = (await request.body()).decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=422, detail="Invalid form payload") from exc
         parsed = parse_qs(body, keep_blank_values=True)
         raw_payload = {key: values[-1] for key, values in parsed.items()}
 
@@ -627,19 +631,6 @@ async def _parse_payload(request: Request, model: type[_PayloadModel]) -> _Paylo
 def startup() -> None:
     enforcement_service.initialize()
     _seed_default_admin()
-    _warn_insecure_config()
-
-
-def _warn_insecure_config() -> None:
-    import sys as _sys
-
-    secret = os.getenv("SESSION_SECRET", "change-me")
-    if secret in _KNOWN_BAD_SECRETS:
-        print(
-            "WARNING: SESSION_SECRET is a known-insecure default. "
-            "Set SESSION_SECRET to a strong random value before exposing this service.",
-            file=_sys.stderr,
-        )
 
 
 def _seed_default_admin() -> None:

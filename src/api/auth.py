@@ -12,9 +12,28 @@ from fastapi import Request
 SESSION_COOKIE = "siem_session"
 SESSION_TTL = 8 * 3600  # 8 hours — also exported so main.py can set cookie max_age
 MIN_PASSWORD_LENGTH = 12
+_MIN_SESSION_SECRET_BYTES = 32
+_INSECURE_SECRET_MARKERS = ("change_me", "change-me", "changeme")
 
 ROLES = ("readonly", "analyst", "admin")
 _ANALYST_AND_ABOVE = frozenset(("analyst", "admin"))
+
+
+def load_session_secret() -> str:
+    """Return a strong SESSION_SECRET, or refuse to start."""
+    value = (os.environ.get("SESSION_SECRET") or "").strip()
+    try:
+        encoded = value.encode("utf-8")
+    except UnicodeEncodeError:
+        encoded = b""
+    if len(encoded) < _MIN_SESSION_SECRET_BYTES or any(
+        marker in value.lower() for marker in _INSECURE_SECRET_MARKERS
+    ):
+        raise RuntimeError(
+            "SESSION_SECRET must be a random value of at least 32 UTF-8 bytes "
+            "(generate one with `openssl rand -base64 32`)"
+        )
+    return value
 
 
 @dataclass(slots=True)
@@ -60,25 +79,24 @@ def create_session_cookie(user_id: int, secret: str) -> str:
 
 
 def _verify_session_cookie(cookie: str, secret: str) -> int | None:
-    parts = cookie.rsplit(":", 2)
-    if len(parts) != 3:
+    try:
+        user_id_str, expires_str, sig = cookie.rsplit(":", 2)
+        payload = f"{user_id_str}:{expires_str}"
+        expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig.encode(), expected.encode()):
+            return None
+        if int(expires_str) < int(time.time()):
+            return None
+        return int(user_id_str)
+    except ValueError:
         return None
-    user_id_str, expires_str, sig = parts
-    payload = f"{user_id_str}:{expires_str}"
-    expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(sig, expected):
-        return None
-    if int(expires_str) < int(time.time()):
-        return None
-    return int(user_id_str)
 
 
-def get_current_user(request: Request, repository) -> UserSession | None:
+def get_current_user(request: Request, repository, secret: str) -> UserSession | None:
     """Verify the session cookie and return the user session, or None if invalid/expired."""
     cookie = request.cookies.get(SESSION_COOKIE)
     if not cookie:
         return None
-    secret = os.getenv("SESSION_SECRET", "change-me")
     user_id = _verify_session_cookie(cookie, secret)
     if user_id is None:
         return None

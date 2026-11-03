@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AlertResponse(BaseModel):
@@ -193,6 +193,17 @@ class DashboardStats(BaseModel):
 class LoginRequest(BaseModel):
     username: str = ""
     password: str = ""
+
+    @field_validator("username", "password")
+    @classmethod
+    def _reject_nul_and_surrogates(cls, value: str) -> str:
+        if "\x00" in value:
+            raise ValueError("must not contain NUL")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise ValueError("must be valid UTF-8") from exc
+        return value
 
 
 class CurrentUserResponse(BaseModel):

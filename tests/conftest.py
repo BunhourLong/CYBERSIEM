@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from unittest.mock import create_autospec, patch
 
@@ -8,6 +9,10 @@ from fastapi.testclient import TestClient
 
 from src.core.http_models import HTTPLogEvent
 from src.security_engine.repository import SecurityRepository
+
+# main.py validates SESSION_SECRET at import time, so set a valid one before test modules import it.
+TEST_SESSION_SECRET = "test-session-secret-0123456789abcdef"
+os.environ["SESSION_SECRET"] = TEST_SESSION_SECRET
 
 _fake = create_autospec(SecurityRepository, instance=True)
 

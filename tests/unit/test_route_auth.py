@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 from fastapi.routing import APIRoute
 from starlette.routing import Mount, Route
@@ -82,10 +84,9 @@ def test_api_docs_are_off_by_default(api_client):
 
 
 @pytest.fixture
-def readonly_client(api_client, fake_repository, monkeypatch):
-    monkeypatch.setenv("SESSION_SECRET", "test-secret")
+def readonly_client(api_client, fake_repository):
     fake_repository.get_user_by_id.return_value = {"id": 1, "username": "ro", "role": "readonly", "is_active": True}
-    api_client.cookies.set("siem_session", create_session_cookie(1, "test-secret"))
+    api_client.cookies.set("siem_session", create_session_cookie(1, os.environ["SESSION_SECRET"]))
     return api_client
 
 
@@ -130,9 +131,8 @@ def test_readonly_role_split_matches_the_guards(readonly_client, fake_repository
 
 
 def _login_as(client, repo, role, monkeypatch, active=True):
-    monkeypatch.setenv("SESSION_SECRET", "test-secret")
     repo.get_user_by_id.return_value = {"id": 1, "username": "u", "role": role, "is_active": active}
-    client.cookies.set("siem_session", create_session_cookie(1, "test-secret"))
+    client.cookies.set("siem_session", create_session_cookie(1, os.environ["SESSION_SECRET"]))
 
 
 def test_admin_routes_403_for_analyst_and_pass_for_admin(api_client, fake_repository, monkeypatch):
@@ -147,7 +147,7 @@ def test_admin_routes_403_for_analyst_and_pass_for_admin(api_client, fake_reposi
 
 
 def test_bad_sessions_get_401_on_every_guarded_route(api_client, fake_repository, monkeypatch):
-    good = create_session_cookie(1, "test-secret")
+    good = create_session_cookie(1, os.environ["SESSION_SECRET"])
     uid, exp, sig = good.split(":")
     flipped = sig[:-1] + ("0" if sig[-1] != "0" else "1")
     cases = {
@@ -157,7 +157,7 @@ def test_bad_sessions_get_401_on_every_guarded_route(api_client, fake_repository
         "missing_user": (good, None),
         "garbage": ("not-a-cookie", {"id": 1, "username": "u", "role": "admin", "is_active": True}),
     }
-    monkeypatch.setenv("SESSION_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_SECRET", os.environ["SESSION_SECRET"])
     for name, (cookie, user) in cases.items():
         fake_repository.get_user_by_id.return_value = user
         api_client.cookies.clear()
@@ -171,10 +171,10 @@ def test_expired_validly_signed_cookie_gets_401(api_client, fake_repository, mon
     import hmac
     import time
 
-    monkeypatch.setenv("SESSION_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_SECRET", os.environ["SESSION_SECRET"])
     fake_repository.get_user_by_id.return_value = {"id": 1, "username": "u", "role": "admin", "is_active": True}
     payload = f"1:{int(time.time()) - 10}"
-    sig = hmac.new(b"test-secret", payload.encode(), hashlib.sha256).hexdigest()
+    sig = hmac.new(os.environ["SESSION_SECRET"].encode(), payload.encode(), hashlib.sha256).hexdigest()
     api_client.cookies.set("siem_session", f"{payload}:{sig}")
     assert api_client.get("/api/dashboard-stats").status_code == 401
 

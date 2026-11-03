@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 
 TOKEN = "s3cret"
@@ -118,9 +120,9 @@ def test_token_outside_the_authorization_header_is_refused(client, fake_reposito
 def test_admin_session_does_not_substitute_for_the_token(client, fake_repository, monkeypatch):
     from src.api.auth import create_session_cookie
 
-    monkeypatch.setenv("SESSION_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_SECRET", os.environ["SESSION_SECRET"])
     fake_repository.get_user_by_id.return_value = {"id": 1, "username": "u", "role": "admin", "is_active": True}
-    client.cookies.set("siem_session", create_session_cookie(1, "test-secret"))
+    client.cookies.set("siem_session", create_session_cookie(1, os.environ["SESSION_SECRET"]))
     assert client.post("/ingest-event", json=BODY).status_code == 401
 
 

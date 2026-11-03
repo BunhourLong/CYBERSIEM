@@ -64,7 +64,7 @@ Go models run through `task ai`, in a clean clone. `explorer` and `chore` (Claud
 ## Token economy
 - Scanners and tests before LLMs: anything a rule can catch becomes a rule, and the reviewer spends tokens only on what rules can't see. A passing test run costs no model tokens.
 - Cheap models write, strong models judge. Claude's limit goes to orchestrating, reviewing and high-risk work; volume goes to Go Flash models.
-- Every OpenCode run starts with about 4.5k tokens of overhead, so ask for one job per run, not many small ones. Premium Go models get only the reviews that need them.
+- Every OpenCode run starts with about 3k tokens of overhead, so ask for one job per run, not many small ones. Premium Go models get only the reviews that need them.
 - Workers start with no history. Give each a path or a short brief and a capped reply. Resume a Claude agent with `SendMessage` rather than starting a new one for a fix.
 - Read with line ranges. `src/api/main.py` and `src/security_engine/repository.py` are large: grep first.
 - Don't open lockfiles, `*.mmdb`, `node_modules`, `dist`, `.angular`.

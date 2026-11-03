@@ -139,7 +139,7 @@ if [ "$agent" = writer ]; then
   changed="$(clone_git diff --cached --no-renames --name-only -z | tr '\0' '\n')"
 
   # Permission rules only cover the edit tool, so check what actually changed before applying it.
-  if grep -qiE '^(\.github|\.claude|\.opencode|scripts)/|^(Taskfile\.yml|opencode\.json|CLAUDE\.md)$|(^|/)\.env|\.mmdb$' <<< "$changed"; then
+  if grep -qiE '^(\.github|\.semgrep|\.claude|\.opencode|scripts)/|^(Taskfile\.yml|opencode\.json|CLAUDE\.md)$|(^|/)\.env|\.mmdb$' <<< "$changed"; then
     echo "Refused: the job changed a protected path:" >&2
     printf '%s\n' "$changed" >&2
     exit 1

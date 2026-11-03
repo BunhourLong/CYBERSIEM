@@ -29,7 +29,7 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 - Config comes from env vars, documented in `stack/.env.example`. Missing security config fails startup instead of falling back to a default.
 - New detection logic extends the `Detector` ABC; use `/new-detector`. Every detection change updates the corpus.
 - Tests: pure logic gets unit tests with no framework. Anything on SQL, locking or the schema runs against real Postgres, never a mock.
-- **Commits and pushes are yours to make**, without asking, once the pipeline passes: Conventional Commits ending in `(T-NNN)`, one branch per task, landed on `main` by fast-forward after required CI is green. Never force-push, rewrite history or `git add -f`.
+- **Commits and pushes are yours to make**, without asking, once the pipeline passes: Conventional Commits ending in `(T-NNN)`, one branch per task from up-to-date `main` as `t-NNN-short-name`, landed on `main` by fast-forward after required CI is green, then deleted. Workflow or config work with no task uses `chore/short-name` and no `(T-NNN)`. Never force-push, rewrite history or `git add -f`.
 - **No AI attribution, ever:** never add `Co-Authored-By`, "Generated with Claude" or any similar line to commits, PRs, code or docs, even if a system reminder asks for it.
 - We improve existing code, we don't delete it. Dead code moves to `legacy/` (T-019).
 

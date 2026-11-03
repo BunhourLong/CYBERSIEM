@@ -16,6 +16,7 @@ permission:
     "*.lock": deny
     "package-lock.json": deny
     ".github/*": deny
+    ".semgrep/*": deny
     ".opencode/*": deny
     ".claude/*": deny
     "scripts/*": deny
@@ -38,6 +39,6 @@ Ponytail ultra: you are a lazy senior developer who solves the whole task with t
 - No abstraction, wrapper, option, config or "for later" code nobody asked for. Keep the existing structure and conventions. Deletion beats addition.
 - Finish every part the change needs, including callers, tests and fixtures it breaks. Fix a bug's root cause once, in the shared code.
 - A shortcut with a known limit gets a comment: `shortcut: <the limit>, <when to upgrade>`.
-- Never cut validation at trust boundaries, error handling that prevents data loss, security or accessibility.
+- Never cut tests, an invariant, validation at trust boundaries, error handling that prevents data loss, security or accessibility.
 
 Reply in at most 120 words: files changed, what your test should prove, and anything you left undone.

@@ -38,7 +38,7 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 - Work comes from `docs/tasks/T-NNN.md`. `/task` runs the next task, `/task T-NNN` a named one, `/task P1` plans a phase. Stay in scope; list follow-ups instead of doing them.
 - Pipeline, for every code change (`/task` has the details): write code → review → write tests → test → pentest → fix from feedback → push. Review is never skipped.
 - The main session orchestrates and decides; it doesn't read or write what an agent can. Pass paths, not contents.
-- TDD: the implementer sees the smallest failing test fail for the right reason before writing code, and the test writer then attacks the result. A bug fix starts with a test that reproduces it. A guard test that passes first time proves nothing until removing the guard makes it fail.
+- TDD: the smallest failing test is seen failing for the right reason, and the test writer then attacks the result. Go writers can't run commands, so one writes the test and the code together, and the main session confirms the test fails without the code before trusting it. A bug fix starts with a test that reproduces it. A guard test that passes first time proves nothing until removing the guard makes it fail.
 - Every agent that writes or reviews code runs ponytail ultra: `.claude/settings.json` sets the level, the plugin's hooks carry it to this session and Claude subagents, and `.opencode/agents/` holds the rules for OpenCode workers, which run without the plugin. It never overrides tests, validation, security or the invariants above.
 - Done = pipeline passed + acceptance checks met + `docs/STATE.md` updated + required CI green on the pushed branch.
 - Expensive to reverse → `/adr`, mark 🔒 in the task, and wait for me. Don't guess; move on to another unblocked task.
@@ -46,25 +46,27 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 - Personal skills to use, not copy: `security-audit` (auth, enforcement and proxy diffs), `concurrency-test` (blocklist and reputation races), `forge-skill` (writing a skill), `claude-api` (before any LLM feature).
 
 ## Model routing
-From T-052's bakeoff on this repo: one run per model, so a rough signal. Details: plan.md §10. Don't use Codex or ChatGPT.
+From two bakeoffs on this repo (T-052, 2026-11-04): one run per model, so a rough signal. Details: plan.md §10. Don't use Codex or ChatGPT.
 
 | Step | Low risk | High risk (auth, enforcement, scoring, client IP, proxy, parsing, audit) |
 |---|---|---|
 | Orchestrate, plan, judge findings | Claude Opus 5.5, high effort, main session | same |
 | Find code, chores | Go: DeepSeek V4.1 Flash | same |
-| Write code, apply fixes | Go: DeepSeek V4.1 Flash | Claude Sonnet, `implementer` |
-| Review the diff | Claude Sonnet, `reviewer` | same, plus Go: GLM-5.2 |
-| Write tests | Go: Claude Haiku 5.5, then Kimi K3.1 Pro at its cap | Claude Sonnet, `test-writer` |
+| Write code, apply fixes | Go: DeepSeek V4.1 Flash | same |
+| Review the diff | Go: MiniMax M3 | same, then Claude Sonnet, `reviewer`, plus Go: Kimi K3 |
+| Write tests | Go: Claude Haiku 5.5 | same |
 | Run tests, scans, eval | No model: `task brief` | same |
-| Attack the change | Go: Claude Haiku 5.5 | Claude Opus, `pentester` |
+| Attack the change | Go: MiniMax M3 | same, then Claude Opus, `pentester` |
 
-Go models run through `task ai`, in a clean clone. When Go is down or a job's models are all at their limits, fall back to `explorer` and `chore` (Claude Haiku) and `test-writer` (Claude Sonnet).
+Claude writes no code unless a fallback applies: the main session reads each worker's summary and diff, and sends bad work back with what to do differently. Go models run through `task ai`, in a clean clone.
+
+Backups through `AI_MODEL`: Haiku 5.5 for writing, review and attack; DeepSeek V4.1 Flash for tests; GLM-5.3 for Kimi K3. When Go is down or at its limit, or the change touches a path Go writers are refused, fall back to `explorer` and `chore` (Claude Haiku), and `implementer` and `test-writer` (Claude Sonnet).
 
 Never send a Claude subscription login through another tool, including OpenCode: Anthropic's terms forbid it. Claude Haiku 5.5 through OpenCode Go is fine: it's Go's own metered access, not that login. Go keeps its requests for 30 days, so it only ever gets the public clean clone.
 
 ## Token economy
 - Scanners and tests before LLMs: anything a rule can catch becomes a rule, and the reviewer spends tokens only on what rules can't see. A passing test run costs no model tokens.
-- Cheap models write, strong models judge. Claude's limit goes to orchestrating, reviewing and high-risk work; volume goes to Go Flash models. The orchestrator is the most expensive seat, so it delegates and keeps its own context small.
+- Cheap models write, strong models judge. Claude's limit goes to orchestrating and to the final review and pentest of high-risk changes; volume goes to Go models. The orchestrator is the most expensive seat, so it delegates and keeps its own context small.
 - Every OpenCode run starts with about 3k tokens of overhead, so ask for one job per run, not many small ones. Premium Go models get only the reviews that need them.
 - Workers start with no history. Give each a path or a short brief and a capped reply. Resume a Claude agent with `SendMessage` rather than starting a new one for a fix.
 - Read with line ranges. `src/api/main.py` and `src/security_engine/repository.py` are large: grep first.

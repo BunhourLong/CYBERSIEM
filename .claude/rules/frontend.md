@@ -8,4 +8,4 @@ paths:
 - `core/models.ts` mirrors `src/api/schemas.py`; change both together until T-020 generates the types.
 - Alert fields hold attacker-controlled text. No `innerHTML` or `bypassSecurityTrust*`. Leaflet popups are built from DOM nodes with `textContent`, as `attack-map.ts` does.
 - API URLs stay relative: the app is served under `/siem/` in the deployment stack.
-- Run scoped: `npx ng test --watch=false` from `frontend/`, through the `test-runner` agent.
+- Run with `task brief -- frontend`, which prints one line on a pass.

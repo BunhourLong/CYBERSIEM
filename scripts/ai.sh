@@ -42,7 +42,8 @@ git -C "$repo" show-ref --verify -q refs/remotes/origin/main && base=refs/remote
 git -C "$work/repo" fetch -q "$repo" "$base:refs/heads/review-base"
 
 status=0
-opencode run --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
+# Claude config on this machine is private and adds tokens, so OpenCode shouldn't load it.
+OPENCODE_DISABLE_CLAUDE_CODE=1 opencode run --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
   > "$events" 2> "$errors" < /dev/null || status=$?
 
 jq -r 'select(.type=="text") | .part.text' "$events" > "$reply"

@@ -32,7 +32,7 @@ def _ai(tmp_path: Path, stub_dir: Path, stub_body: str, **env_extra: str) -> tup
     repo.mkdir()
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.test"]
     (repo / ".gitignore").write_text(".scan\n")
-    for args in (["init", "-q"], ["add", "-A"], ["commit", "-qm", "x"]):
+    for args in (["init", "-q", "-b", "main"], ["add", "-A"], ["commit", "-qm", "x"]):
         subprocess.run([*git, *args], cwd=repo, check=True)  # noqa: S603  # constant commands in a temp repo
     prompt = tmp_path / "prompt.md"
     prompt.write_text("do it")

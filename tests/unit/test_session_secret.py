@@ -23,7 +23,7 @@ USER = {"id": 1, "username": "u", "role": "admin", "is_active": True}
         "change_me" * 4,
         "change-me" * 4,
         "changeme" * 5,
-        "\ud800" + "a" * 31,
+        "\udcff" + "a" * 31,
     ],
     ids=["unset", "empty", "whitespace", "31_bytes", "change_me", "change-me", "changeme", "unencodable"],
 )
@@ -39,7 +39,7 @@ def test_weak_session_secret_is_refused_without_echoing_it(monkeypatch, value):
     message = str(exc.value)
     assert "SESSION_SECRET" in message
     assert "openssl rand -base64 32" in message
-    if value and value.strip() and value.strip() != "SESSION_SECRET":
+    if value and value.strip():
         assert value.strip() not in message
 
 
@@ -80,8 +80,8 @@ def test_cookie_signed_with_the_real_secret_is_accepted(api_client, fake_reposit
 
 def test_non_ascii_signature_cookie_is_rejected(api_client, fake_repository):
     fake_repository.get_user_by_id.return_value = USER
-    api_client.cookies.set("siem_session", "a:b:é")
-    assert api_client.get("/api/auth/me").status_code == 401
+    headers = {"cookie": "siem_session=a:b:é".encode("latin-1")}
+    assert api_client.get("/api/auth/me", headers=headers).status_code == 401
 
 
 def test_non_utf8_form_body_is_422(api_client):

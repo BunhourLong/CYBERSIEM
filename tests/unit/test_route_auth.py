@@ -130,23 +130,23 @@ def test_readonly_role_split_matches_the_guards(readonly_client, fake_repository
         assert (status == 200) if user_level else (status == 403), f"{method} {route.path} gave {status}"
 
 
-def _login_as(client, repo, role, monkeypatch, active=True):
+def _login_as(client, repo, role, active=True):
     repo.get_user_by_id.return_value = {"id": 1, "username": "u", "role": role, "is_active": active}
     client.cookies.set("siem_session", create_session_cookie(1, os.environ["SESSION_SECRET"]))
 
 
-def test_admin_routes_403_for_analyst_and_pass_for_admin(api_client, fake_repository, monkeypatch):
+def test_admin_routes_403_for_analyst_and_pass_for_admin(api_client, fake_repository):
     fake_repository.delete_all_alerts.return_value = 3
-    _login_as(api_client, fake_repository, "analyst", monkeypatch)
+    _login_as(api_client, fake_repository, "analyst")
     assert api_client.post("/ip-controls", json=BODY).status_code == 403
     assert api_client.delete("/alerts").status_code == 403
     fake_repository.delete_all_alerts.assert_not_called()
-    _login_as(api_client, fake_repository, "admin", monkeypatch)
+    _login_as(api_client, fake_repository, "admin")
     assert api_client.delete("/alerts").json() == {"deleted": 3}
     assert api_client.post("/ip-controls", json={}).status_code == 422  # past the guard, body rejected
 
 
-def test_bad_sessions_get_401_on_every_guarded_route(api_client, fake_repository, monkeypatch):
+def test_bad_sessions_get_401_on_every_guarded_route(api_client, fake_repository):
     good = create_session_cookie(1, os.environ["SESSION_SECRET"])
     uid, exp, sig = good.split(":")
     flipped = sig[:-1] + ("0" if sig[-1] != "0" else "1")
@@ -157,7 +157,6 @@ def test_bad_sessions_get_401_on_every_guarded_route(api_client, fake_repository
         "missing_user": (good, None),
         "garbage": ("not-a-cookie", {"id": 1, "username": "u", "role": "admin", "is_active": True}),
     }
-    monkeypatch.setenv("SESSION_SECRET", os.environ["SESSION_SECRET"])
     for name, (cookie, user) in cases.items():
         fake_repository.get_user_by_id.return_value = user
         api_client.cookies.clear()
@@ -166,12 +165,11 @@ def test_bad_sessions_get_401_on_every_guarded_route(api_client, fake_repository
             assert _call(api_client, method, path, JSON).status_code == 401, f"{name} {method} {path}"
 
 
-def test_expired_validly_signed_cookie_gets_401(api_client, fake_repository, monkeypatch):
+def test_expired_validly_signed_cookie_gets_401(api_client, fake_repository):
     import hashlib
     import hmac
     import time
 
-    monkeypatch.setenv("SESSION_SECRET", os.environ["SESSION_SECRET"])
     fake_repository.get_user_by_id.return_value = {"id": 1, "username": "u", "role": "admin", "is_active": True}
     payload = f"1:{int(time.time()) - 10}"
     sig = hmac.new(os.environ["SESSION_SECRET"].encode(), payload.encode(), hashlib.sha256).hexdigest()
@@ -208,10 +206,10 @@ def test_api_docs_flag_only_exact_true_enables_docs(value, docs):
     assert ("/docs" in out.stdout) is docs
 
 
-def test_block_ip_body_validation_runs_after_auth(api_client, fake_repository, monkeypatch):
+def test_block_ip_body_validation_runs_after_auth(api_client, fake_repository):
     for kwargs in ({"content": "{bad", "headers": {"content-type": "application/json"}}, {"json": {"ip": 5}}, {}):
         assert api_client.post("/block-ip", **kwargs).status_code == 401
-    _login_as(api_client, fake_repository, "analyst", monkeypatch)
+    _login_as(api_client, fake_repository, "analyst")
     assert api_client.post("/block-ip", content="{bad", headers={"content-type": "application/json"}).status_code == 422
     assert api_client.post("/block-ip", json={"reason": "x"}).status_code == 422
 
@@ -230,7 +228,7 @@ def test_query_cap_edges(api_client, fake_repository, monkeypatch, path, param, 
 
     monkeypatch.setattr(main.enforcement_service, "refresh_known_ip_states", lambda **_: None)
     readonly_client = api_client
-    _login_as(api_client, fake_repository, "analyst", monkeypatch)
+    _login_as(api_client, fake_repository, "analyst")
     fake_repository.count_ip_states.return_value = {}
     assert readonly_client.get(f"{path}?{param}={cap + 1}").status_code == 422
     assert readonly_client.get(f"{path}?{param}={cap}").status_code == 200

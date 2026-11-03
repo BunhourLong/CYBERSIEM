@@ -26,9 +26,7 @@ def load_session_secret() -> str:
         encoded = value.encode("utf-8")
     except UnicodeEncodeError:
         encoded = b""
-    if len(encoded) < _MIN_SESSION_SECRET_BYTES or any(
-        marker in value.lower() for marker in _INSECURE_SECRET_MARKERS
-    ):
+    if len(encoded) < _MIN_SESSION_SECRET_BYTES or any(marker in value.lower() for marker in _INSECURE_SECRET_MARKERS):
         raise RuntimeError(
             "SESSION_SECRET must be a random value of at least 32 UTF-8 bytes "
             "(generate one with `openssl rand -base64 32`)"

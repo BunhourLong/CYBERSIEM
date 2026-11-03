@@ -355,7 +355,6 @@ async def login(request: Request):
             status_code=429,
         )
 
-    secret = SESSION_SECRET
     user = repository.get_user_by_username(username)
 
     # Always call verify_password to prevent username enumeration via timing side-channel.
@@ -378,7 +377,7 @@ async def login(request: Request):
     _clear_lockout(username)
     _audit(username, "login_success", None, request)
     response = JSONResponse(CurrentUserResponse(username=user["username"], role=user["role"]).model_dump())
-    cookie = create_session_cookie(user["id"], secret)
+    cookie = create_session_cookie(user["id"], SESSION_SECRET)
     secure_flag = os.getenv("SESSION_SECURE", "").lower() in ("1", "true", "yes")
     response.set_cookie(
         SESSION_COOKIE,
@@ -624,7 +623,9 @@ async def _parse_payload(request: Request, model: type[_PayloadModel]) -> _Paylo
     try:
         return model.model_validate(raw_payload)
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors(include_url=False, include_input=False)) from exc
+        raise HTTPException(
+            status_code=422, detail=exc.errors(include_url=False, include_input=False, include_context=False)
+        ) from exc
 
 
 @app.on_event("startup")

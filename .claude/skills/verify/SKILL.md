@@ -6,11 +6,11 @@ description: Run CyberSIEM's checks (lint, tests, frontend tests and build, secu
 Run the narrowest check that covers the change, then the full gate:
 
 1. Python in one area changed: `task test -- tests/unit/<file>.py 2>&1 | tail -n 60`.
-2. Then the gate: delegate `task check` to the `test-runner` agent (it returns failures only).
-3. Detection or scoring changed: delegate `task eval` to `test-runner`, and report any false-positive or detection rate that moved.
+2. Then the gate: `task brief -- check` (one line on a pass, the tail on a failure).
+3. Detection or scoring changed: `task brief -- eval`, and report any false-positive or detection rate that moved.
 4. `src/api/schemas.py` or `frontend/src/app/core/models.ts` changed: confirm both changed together.
-5. Docker or NGINX config changed: delegate `task security:infra` to `test-runner`. Then `docker compose -f docker/docker-compose.yml config -q`, exporting dummy values for required secrets, and start the stack if the task's checks need it.
-6. Auth, secrets, dependencies or workflows changed: delegate the matching `task security:<name>` to `test-runner`.
+5. Docker or NGINX config changed: `task brief -- security:infra`. Then `docker compose -f docker/docker-compose.yml config -q`, exporting dummy values for required secrets, and start the stack if the task's checks need it.
+6. Auth, secrets, dependencies or workflows changed: the matching `task brief -- security:<name>`.
 
 `task check` has no Python tests until T-001 lands, so say that instead of implying Python was tested.
 

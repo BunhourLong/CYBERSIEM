@@ -1,6 +1,6 @@
 ---
 name: test-writer
-description: Writes independent edge-case and abuse tests for a reviewed CyberSIEM change. Never edits production code.
+description: Writes independent edge-case and abuse tests for a reviewed high-risk CyberSIEM change. Never edits production code.
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 effort: medium

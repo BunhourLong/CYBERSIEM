@@ -46,23 +46,26 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 - Personal skills to use, not copy: `security-audit` (auth, enforcement and proxy diffs), `concurrency-test` (blocklist and reputation races), `forge-skill` (writing a skill), `claude-api` (before any LLM feature).
 
 ## Model routing
-| Step | Who | Model, effort |
+Provisional until T-052 tests the OpenCode Go models on this repo. Details: plan.md §10. Don't use Codex or ChatGPT.
+
+| Step | Low risk | High risk (auth, enforcement, scoring, client IP, proxy, parsing, audit) |
 |---|---|---|
-| Orchestrate `/task`, judge findings | main session | Sonnet (`/model sonnet`) |
-| Find code | `explorer` | Haiku, low |
-| Write code, apply fixes | `implementer` | Sonnet, medium |
-| Review the diff | `reviewer` | Sonnet, medium |
-| Write edge and abuse tests | `test-writer` | Sonnet, medium |
-| Run tests, scans, eval; report failures | `test-runner` | Haiku, low |
-| Attack the change | `pentester` | Opus, medium; high for auth, enforcement, scoring, proxy or parsing |
-| Second opinion on high-risk diffs | `task review:second` (shell, clean clone) | Codex, on your ChatGPT login |
-| Mechanical chores: docs, renames, moves, version bumps | `chore` | Haiku, low |
-| Plan a phase, 🔒 decisions, a bug that survived 2 fix rounds | main session | Opus, only for that step |
+| Orchestrate, judge findings | Claude Sonnet, main session | same |
+| Find code, chores | Go: DeepSeek V4.1 Flash | same |
+| Write code, apply fixes | Go: DeepSeek V4.1 Flash | Claude Sonnet, `implementer` |
+| Review the diff | Claude Sonnet, `reviewer` | same, plus Go: Gemini 4 Argon |
+| Write tests | Go: Haiku 5.5 | Claude Sonnet, `test-writer` |
+| Run tests, scans, eval | No model: `task brief` | same |
+| Attack the change | Go: Gemini 4 Argon | Claude Opus, `pentester` |
+| Plan a phase, 🔒 decisions, a bug that survived 2 fix rounds | Claude Opus, main session, only for that step | same |
+
+Go models run through `task ai`, in a clean clone. `explorer` and `chore` (Claude Haiku) are the fallback when Go is down or at its limit.
 
 ## Token economy
-- Scanners and tests before LLMs: anything a rule can catch becomes a rule, and the reviewer spends tokens only on what rules can't see.
-- Agents start with no conversation history. Give each the task file's path and capped replies, and resume an agent with `SendMessage` rather than starting a new one for a fix.
-- Locate code with `explorer`; run noisy commands through `test-runner` and bring back failures only.
+- Scanners and tests before LLMs: anything a rule can catch becomes a rule, and the reviewer spends tokens only on what rules can't see. A passing test run costs no model tokens.
+- Cheap models write, strong models judge. Claude's limit goes to orchestrating, reviewing and high-risk work; volume goes to Go Flash models.
+- Every OpenCode run starts with about 13k tokens of overhead, so ask for one job per run, not many small ones. Premium Go models get only the reviews that need them.
+- Workers start with no history. Give each a path or a short brief and a capped reply. Resume a Claude agent with `SendMessage` rather than starting a new one for a fix.
 - Read with line ranges. `src/api/main.py` and `src/security_engine/repository.py` are large: grep first.
 - Don't open lockfiles, `*.mmdb`, `node_modules`, `dist`, `.angular`.
 - Don't paste whole files or long logs in replies; summarize and cite `path:line`.

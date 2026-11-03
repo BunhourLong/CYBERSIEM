@@ -27,10 +27,15 @@ tasks:
       - task: check
       - git push -u origin HEAD
 
-  review:second:
-    desc: Get a second opinion from Codex on this branch's commits. SECOND_OPINION_MODEL picks the model
+  ai:
+    desc: 'Run a job on an OpenCode Go model: task ai -- <explore|write|tests|review> <prompt-file>. AI_MODEL overrides the model'
     cmds:
-      - bash scripts/second_opinion.sh
+      - bash scripts/ai.sh {{.CLI_ARGS}}
+
+  brief:
+    desc: 'Run a task and print one line on a pass or the tail on a failure: task brief -- check'
+    cmds:
+      - bash scripts/brief.sh task {{.CLI_ARGS}}
 
   lint:
     desc: Fail on Python syntax errors and undefined names. T-001 widens this after its formatting commit

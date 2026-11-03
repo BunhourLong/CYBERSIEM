@@ -154,9 +154,12 @@ Open `http://localhost/siem/login` and sign in with the credentials from `.env`.
 | `SIEM_ADMIN_USERNAME` | `admin` | Dashboard login username |
 | `SIEM_ADMIN_PASSWORD` | `Admin123456!!` | Dashboard login password (min 12 chars) |
 | `SIEM_SESSION_SECRET` | _(placeholder)_ | HMAC secret for cookies — run `openssl rand -base64 32` |
+| `TRUSTED_PROXY_CIDRS` | _(empty)_ | Comma-separated CIDRs of load balancers in front of NGINX; empty when NGINX is the edge, never a /0 |
 | `DATABASE_URL` | _(local postgres)_ | PostgreSQL connection string |
 | `GEOIP_DB_PATH` | `/data/GeoLite2-City.mmdb` | Container path to GeoIP database |
 | `SESSION_SECURE` | `false` | Set `true` only after HTTPS is configured |
+
+Docker Desktop's published ports can make every client appear as the gateway. Send a request from another machine and confirm its IP is `$remote_addr`, the first field of NGINX's access.log.
 
 See [`stack/.env.example`](stack/.env.example) for the full documented list.
 

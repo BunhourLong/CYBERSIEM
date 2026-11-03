@@ -151,3 +151,17 @@ def test_body_ip_is_honoured_only_with_the_token(client, fake_repository, monkey
     assert fake_repository.mock_calls == []
     ok = client.post("/ingest-event", json={**BODY, "ip": "198.51.100.9"}, headers=_auth())
     assert ok.json()["ip"] == "198.51.100.9"
+
+
+def test_process_event_runs_off_the_event_loop(client, monkeypatch):
+    import asyncio
+
+    from src.api import main
+
+    def stub(event):
+        with pytest.raises(RuntimeError):
+            asyncio.get_running_loop()
+        return []
+
+    monkeypatch.setattr(main.security_engine, "process_event", stub)
+    assert client.post("/ingest-event", json=BODY, headers=_auth()).status_code == 202

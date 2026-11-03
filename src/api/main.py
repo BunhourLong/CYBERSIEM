@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
+from starlette.concurrency import run_in_threadpool
 
 from src.api.auth import (
     SESSION_COOKIE,
@@ -853,8 +854,9 @@ async def ingest_event(request: Request):
             skew = None
         if skew is None or skew > INGEST_MAX_CLOCK_SKEW:
             raise HTTPException(status_code=422, detail="timestamp out of range")
-    event = _build_ingest_event(payload)
-    alerts = security_engine.process_event(event)
+    # Blocking IO (database, files): keep it off the event loop.
+    event = await run_in_threadpool(_build_ingest_event, payload)
+    alerts = await run_in_threadpool(security_engine.process_event, event)
     return IngestEventResponse(
         ip=event.ip,
         ip_source=event.ip_source,

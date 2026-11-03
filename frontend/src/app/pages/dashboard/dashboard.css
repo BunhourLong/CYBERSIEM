@@ -163,11 +163,21 @@
   border-radius: 9999px;
 }
 
-.bar__fill--red { background: var(--red-500); }
-.bar__fill--orange { background: var(--orange-400); }
-.bar__fill--amber { background: var(--amber-400); }
-.bar__fill--emerald { background: var(--emerald-500); }
-.bar__fill--zinc { background: var(--zinc-500); }
+.bar__fill--red {
+  background: var(--red-500);
+}
+.bar__fill--orange {
+  background: var(--orange-400);
+}
+.bar__fill--amber {
+  background: var(--amber-400);
+}
+.bar__fill--emerald {
+  background: var(--emerald-500);
+}
+.bar__fill--zinc {
+  background: var(--zinc-500);
+}
 
 /* ── Alerts-over-time histogram ─────────────────────────────────────────── */
 

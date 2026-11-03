@@ -8,16 +8,16 @@ from urllib.parse import urlsplit
 from src.core.http_models import HTTPLogEvent
 
 NGINX_COMBINED_LOG_PATTERN = re.compile(
-    r'^(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>[^\]]+)\] '
+    r"^(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>[^\]]+)\] "
     r'"(?P<method>[A-Z]+) (?P<target>\S+) HTTP/(?P<http_version>[^"]+)" '
-    r'(?P<status>\d{3}) (?P<body_bytes_sent>\d+|-) '
+    r"(?P<status>\d{3}) (?P<body_bytes_sent>\d+|-) "
     r'"(?P<referer>[^"]*)" "(?P<user_agent>[^"]*)"$'
 )
 
 NGINX_EXTENDED_LOG_PATTERN = re.compile(
-    r'^(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>[^\]]+)\] '
+    r"^(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>[^\]]+)\] "
     r'"(?P<method>[A-Z]+) (?P<target>\S+) HTTP/(?P<http_version>[^"]+)" '
-    r'(?P<status>\d{3}) (?P<body_bytes_sent>\d+|-) '
+    r"(?P<status>\d{3}) (?P<body_bytes_sent>\d+|-) "
     r'"(?P<referer>[^"]*)" "(?P<user_agent>[^"]*)" '
     r'"(?P<x_forwarded_for>[^"]*)" "(?P<x_real_ip>[^"]*)" "(?P<peer_ip>[^"]*)"$'
 )

@@ -6,12 +6,20 @@ from datetime import timedelta
 from src.core.http_models import DetectionAlert, HTTPLogEvent
 from src.security_engine.detectors.base import Detector
 
-
 _AUTH_FAILURE_CODES = frozenset({401, 403})
-_AUTH_PATH_FRAGMENTS = frozenset({
-    "login", "signin", "sign-in", "auth", "authenticate",
-    "password", "token", "session", "wp-login",
-})
+_AUTH_PATH_FRAGMENTS = frozenset(
+    {
+        "login",
+        "signin",
+        "sign-in",
+        "auth",
+        "authenticate",
+        "password",
+        "token",
+        "session",
+        "wp-login",
+    }
+)
 
 
 def _is_auth_endpoint(endpoint: str) -> bool:

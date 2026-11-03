@@ -8,7 +8,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
-
 ALERT_STATUSES = ("unresolved", "safe", "malicious")
 REPUTATION_STATES = ("trusted", "unknown", "suspicious", "throttled", "blocked")
 ANALYST_OVERRIDE_VALUES = (
@@ -143,24 +142,16 @@ class ReputationConfig:
             DEFAULT_SEVERITY_WEIGHTS,
         )
     )
-    repeat_window_seconds: int = field(
-        default_factory=lambda: _parse_int_env("REPUTATION_REPEAT_WINDOW_SECONDS", 900)
-    )
+    repeat_window_seconds: int = field(default_factory=lambda: _parse_int_env("REPUTATION_REPEAT_WINDOW_SECONDS", 900))
     repeat_multiplier_step: float = field(
         default_factory=lambda: _parse_float_env("REPUTATION_REPEAT_MULTIPLIER_STEP", 0.35)
     )
     repeat_multiplier_cap: float = field(
         default_factory=lambda: _parse_float_env("REPUTATION_REPEAT_MULTIPLIER_CAP", 2.5)
     )
-    decay_grace_seconds: int = field(
-        default_factory=lambda: _parse_int_env("REPUTATION_DECAY_GRACE_SECONDS", 900)
-    )
-    decay_per_hour: float = field(
-        default_factory=lambda: _parse_float_env("REPUTATION_DECAY_PER_HOUR", 8.0)
-    )
-    streak_reset_seconds: int = field(
-        default_factory=lambda: _parse_int_env("REPUTATION_STREAK_RESET_SECONDS", 3600)
-    )
+    decay_grace_seconds: int = field(default_factory=lambda: _parse_int_env("REPUTATION_DECAY_GRACE_SECONDS", 900))
+    decay_per_hour: float = field(default_factory=lambda: _parse_float_env("REPUTATION_DECAY_PER_HOUR", 8.0))
+    streak_reset_seconds: int = field(default_factory=lambda: _parse_int_env("REPUTATION_STREAK_RESET_SECONDS", 3600))
     repeated_medium_alert_count: int = field(
         default_factory=lambda: _parse_int_env("REPUTATION_REPEATED_MEDIUM_ALERT_COUNT", 3)
     )
@@ -192,15 +183,11 @@ class ReputationConfig:
     def __post_init__(self) -> None:
         for state in REPUTATION_STATES:
             self.score_thresholds.setdefault(state, DEFAULT_STATE_THRESHOLDS[state])
-        self.score_thresholds = {
-            state: float(self.score_thresholds[state]) for state in REPUTATION_STATES
-        }
+        self.score_thresholds = {state: float(self.score_thresholds[state]) for state in REPUTATION_STATES}
 
         for severity, value in DEFAULT_SEVERITY_WEIGHTS.items():
             self.severity_weights.setdefault(severity, value)
-        self.severity_weights = {
-            str(key): float(value) for key, value in self.severity_weights.items()
-        }
+        self.severity_weights = {str(key): float(value) for key, value in self.severity_weights.items()}
 
     @property
     def blocked_threshold(self) -> float:
@@ -392,8 +379,7 @@ def evaluate_ip_reputation(
     # Hold is active when any non-safe alert meets the actionable threshold.
     # It clears only when every alert for this IP has been marked safe.
     new_alert_hold = (unresolved_alert_count > 0 or malicious_alert_count > 0) and any(
-        config.weight_for_alert(a.alert_type, a.severity) >= ALERT_HOLD_MIN_WEIGHT
-        or a.severity == "high"
+        config.weight_for_alert(a.alert_type, a.severity) >= ALERT_HOLD_MIN_WEIGHT or a.severity == "high"
         for a in alert_evidence
     )
 

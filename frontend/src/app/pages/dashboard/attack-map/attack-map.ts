@@ -118,7 +118,13 @@ export class AttackMap {
         }).addTo(this.markers);
       }
 
-      L.circleMarker([lat, lon], { radius: 6, color, fillColor: color, fillOpacity: 0.85, weight: 1 })
+      L.circleMarker([lat, lon], {
+        radius: 6,
+        color,
+        fillColor: color,
+        fillOpacity: 0.85,
+        weight: 1,
+      })
         .bindPopup(() => this.buildPopup(point))
         .addTo(this.markers);
       bounds.push([lat, lon]);
@@ -151,7 +157,9 @@ export class AttackMap {
     };
 
     line(point.ip, 'map-popup__ip');
-    line(`Location: ${joinPresent([point.city, point.subdivision, point.country]) || 'Unavailable'}`);
+    line(
+      `Location: ${joinPresent([point.city, point.subdivision, point.country]) || 'Unavailable'}`,
+    );
     line(`Accuracy: ${formatAccuracy(point.accuracy_radius_km)}`);
     line(`Type: ${point.type}`);
     if (point.organization) {

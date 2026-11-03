@@ -9,7 +9,6 @@ from typing import Final
 from geoip2.database import Reader
 from geoip2.errors import AddressNotFoundError
 
-
 DEFAULT_ASN_DB_PATH: Final[str] = os.getenv(
     "GEOIP_ASN_DB_PATH",
     "data/GeoLite2-ASN.mmdb",
@@ -46,7 +45,7 @@ class ASNResolver:
     def is_available(self) -> bool:
         return os.path.isfile(self.database_path)
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=1)  # noqa: B019
     def _reader(self) -> Reader | None:
         if not self.is_available:
             return None
@@ -71,11 +70,7 @@ class ASNResolver:
         normalized_org = organization.casefold()
         provider = _match_provider(normalized_org)
         is_datacenter = provider is not None
-        reason = (
-            f"ASN {response.autonomous_system_number} belongs to {organization}"
-            if organization
-            else None
-        )
+        reason = f"ASN {response.autonomous_system_number} belongs to {organization}" if organization else None
 
         return ASNDetectionResult(
             ip=ip,

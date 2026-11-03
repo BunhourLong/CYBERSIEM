@@ -1,9 +1,9 @@
-import streamlit as st
-import pandas as pd
-import time
-from pymongo import MongoClient
 import os
+
+import pandas as pd
 import plotly.express as px
+import streamlit as st
+from pymongo import MongoClient
 from streamlit_autorefresh import st_autorefresh
 
 # -----------------------------
@@ -11,10 +11,7 @@ from streamlit_autorefresh import st_autorefresh
 # -----------------------------
 st_autorefresh(interval=5000, key="refresh")
 
-MONGO_URI = os.getenv(
-    "MONGO_URI",
-    "mongodb://sentinel:sentinelpass@localhost:27017"
-)
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://sentinel:sentinelpass@localhost:27017")
 
 client = MongoClient(MONGO_URI)
 db = client["sentinel_ids"]
@@ -25,10 +22,7 @@ events_collection = db["events"]
 # Page Config
 # -----------------------------
 
-st.set_page_config(
-    page_title="Sentinel IDS",
-    layout="wide"
-)
+st.set_page_config(page_title="Sentinel IDS", layout="wide")
 
 st.title("🛡️ Sentinel IDS - Live Monitoring")
 
@@ -40,13 +34,9 @@ st_autorefresh = st.empty()
 # Fetch Data
 # -----------------------------
 
+
 def get_recent_events(limit=200):
-    events = list(
-        events_collection
-        .find()
-        .sort("timestamp", -1)
-        .limit(limit)
-    )
+    events = list(events_collection.find().sort("timestamp", -1).limit(limit))
     return events
 
 
@@ -82,6 +72,7 @@ col4.metric("Normal Traffic 🟢", normal_count)
 
 st.divider()
 
+
 def show_map(df):
     geo_df = df.dropna(subset=["latitude", "longitude"])
 
@@ -89,11 +80,7 @@ def show_map(df):
         st.info("No geolocation data yet.")
         return
 
-    color_map = {
-        "normal": "green",
-        "port_scan": "orange",
-        "brute_force": "red"
-    }
+    color_map = {"normal": "green", "port_scan": "orange", "brute_force": "red"}
 
     geo_df["color"] = geo_df["classification"].map(color_map)
 
@@ -104,19 +91,13 @@ def show_map(df):
         hover_name="src_ip",
         hover_data=["country", "classification", "severity"],
         color="classification",
-        color_discrete_map={
-            "normal": "green",
-            "port_scan": "orange",
-            "brute_force": "red"
-        }
+        color_discrete_map={"normal": "green", "port_scan": "orange", "brute_force": "red"},
     )
 
-    fig.update_layout(
-        title="Global Traffic Map",
-        height=600
-    )
+    fig.update_layout(title="Global Traffic Map", height=600)
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 st.divider()
 st.subheader("🌍 Global Traffic Overview")
@@ -125,6 +106,7 @@ show_map(df)
 # -----------------------------
 # Styled Event Table
 # -----------------------------
+
 
 def highlight_severity(row):
     if row["severity"] == "high":

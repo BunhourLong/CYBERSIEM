@@ -22,9 +22,7 @@ class SecurityEngine:
         enforcement_service: EnforcementService | None = None,
     ) -> None:
         self.repository = repository or SecurityRepository()
-        self.enforcement_service = enforcement_service or EnforcementService(
-            repository=self.repository
-        )
+        self.enforcement_service = enforcement_service or EnforcementService(repository=self.repository)
         self.detectors = [
             RateAbuseDetector(),
             BruteForceDetector(),

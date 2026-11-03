@@ -73,10 +73,7 @@ class PathProbeDetector(Detector):
 
         # Path probe: broad endpoint enumeration
         unique_endpoints = {ep for _, ep in all_reqs}
-        if (
-            len(all_reqs) >= self.probe_request_threshold
-            and len(unique_endpoints) >= self.probe_unique_path_threshold
-        ):
+        if len(all_reqs) >= self.probe_request_threshold and len(unique_endpoints) >= self.probe_unique_path_threshold:
             confidence = min(90, 50 + len(unique_endpoints) * 2)
             self._last_alert_at[event.ip] = now
             return [

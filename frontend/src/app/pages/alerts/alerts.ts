@@ -4,7 +4,17 @@ import { Component, computed, effect, inject, signal, untracked } from '@angular
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Params, Router } from '@angular/router';
-import { Observable, Subject, catchError, debounceTime, finalize, merge, of, switchMap, timer } from 'rxjs';
+import {
+  Observable,
+  Subject,
+  catchError,
+  debounceTime,
+  finalize,
+  merge,
+  of,
+  switchMap,
+  timer,
+} from 'rxjs';
 
 import {
   confidenceLevel,
@@ -35,7 +45,13 @@ const IP_FILTER_DEBOUNCE_MS = 600;
 const EXPANDED_STORAGE_KEY = 'cybersiem-expanded-alerts';
 const CLEAR_ALL_KEY = 'all-alerts';
 
-const EMPTY_FILTERS: AlertFilters = { type: '', severity: '', status: '', ip: '', blockedOnly: false };
+const EMPTY_FILTERS: AlertFilters = {
+  type: '',
+  severity: '',
+  status: '',
+  ip: '',
+  blockedOnly: false,
+};
 
 const STATUS_ACTIONS: readonly { status: AlertStatus; label: string }[] = [
   { status: 'unresolved', label: 'Unresolved' },
@@ -95,7 +111,9 @@ function toRow(alert: Alert) {
   return {
     alert,
     stateLabel: alert.current_state || 'trusted',
-    stateTone: (alert.current_state === 'unknown' ? 'strong' : stateTone(alert.current_state, 'emerald')) as Tone,
+    stateTone: (alert.current_state === 'unknown'
+      ? 'strong'
+      : stateTone(alert.current_state, 'emerald')) as Tone,
     severityTone: severityTone(alert.severity, 'strong'),
     statusTone: STATUS_TONES[alert.status] ?? 'emerald',
     confidence,
@@ -260,7 +278,8 @@ export class Alerts {
       next: () => this.reload$.next(),
       error: (error: unknown) => {
         // 401/403 are handled globally by the auth interceptor.
-        const handled = error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403);
+        const handled =
+          error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403);
         if (!handled) {
           this.actionError.set(apiErrorMessage(error));
           this.reload$.next();

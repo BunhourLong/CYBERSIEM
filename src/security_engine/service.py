@@ -67,9 +67,7 @@ class LogMonitorService:
                             continue
 
                         if not log_file.exists():
-                            self._log(
-                                f"NGINX access log disappeared, waiting for {log_file}..."
-                            )
+                            self._log(f"NGINX access log disappeared, waiting for {log_file}...")
                             self._reset_idle_log_timer()
                             break
 

@@ -8,6 +8,7 @@ Usage (from project root):
 
 Password is read from the ADMIN_PASSWORD env var or prompted interactively.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -55,6 +56,7 @@ def main() -> None:
         sys.exit(1)
 
     from src.api.auth import validate_password
+
     policy_err = validate_password(password)
     if policy_err:
         print(f"Error: {policy_err}", file=sys.stderr)
@@ -65,10 +67,7 @@ def main() -> None:
 
     if existing:
         if not args.overwrite:
-            print(
-                f"User {args.username!r} already exists (role: {existing['role']}). "
-                "Use --overwrite to update role."
-            )
+            print(f"User {args.username!r} already exists (role: {existing['role']}). Use --overwrite to update role.")
             sys.exit(0)
         updated = repo.update_user_role(args.username, args.role)
         if updated:

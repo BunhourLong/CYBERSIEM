@@ -9,7 +9,6 @@ from typing import Any
 import geoip2.database
 from geoip2.errors import AddressNotFoundError
 
-
 DEFAULT_GEOIP_DB_PATHS = tuple(
     path
     for path in (
@@ -100,10 +99,7 @@ def lookup_ip_location(ip: str) -> dict[str, Any] | None:
         _log_geo(f"GeoLite lookup failed for ip={ip} reason=missing_coordinates")
         return None
 
-    _log_geo(
-        "GeoLite lookup succeeded for "
-        f"ip={ip} country={response.country.name!r} city={response.city.name!r}"
-    )
+    _log_geo(f"GeoLite lookup succeeded for ip={ip} country={response.country.name!r} city={response.city.name!r}")
     return {
         "country": response.country.name,
         "country_code": response.country.iso_code,

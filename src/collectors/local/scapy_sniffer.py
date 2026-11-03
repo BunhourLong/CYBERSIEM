@@ -1,5 +1,7 @@
 from datetime import datetime
+
 from scapy.layers.inet import IP, TCP, UDP
+
 from src.core.schemas import NetworkEvent
 
 
@@ -28,5 +30,5 @@ def packet_to_event(packet) -> NetworkEvent | None:
         src_port=src_port,
         dst_port=dst_port,
         packet_size=len(packet),
-        tcp_flags=tcp_flags
+        tcp_flags=tcp_flags,
     )

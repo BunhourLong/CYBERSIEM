@@ -11,13 +11,13 @@ class NetworkEvent:
     # Network identity
     src_ip: str
     dst_ip: str
-    protocol: str            # TCP / UDP / ICMP
+    protocol: str  # TCP / UDP / ICMP
     src_port: Optional[int]
     dst_port: Optional[int]
 
     # Traffic metadata
     packet_size: int
-    tcp_flags: Optional[str] # SYN, ACK, SYN-ACK, etc.
+    tcp_flags: Optional[str]  # SYN, ACK, SYN-ACK, etc.
 
     # Geo context (resolved later)
     country: Optional[str] = None
@@ -26,7 +26,7 @@ class NetworkEvent:
 
     # IDS classification
     classification: str = "unknown"
-    severity: str = "info"   # info | low | medium | high
+    severity: str = "info"  # info | low | medium | high
     confidence: float = 0.0
 
     # Correlation helpers

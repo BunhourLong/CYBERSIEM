@@ -8,11 +8,10 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
-
 TOR_EXIT_ADDRESSES_URL = "https://check.torproject.org/exit-addresses"
 DEFAULT_TOR_CACHE_PATH = os.getenv(
     "TOR_EXIT_NODES_CACHE_PATH",
-    "/tmp/cybersiem_tor_exit_nodes.txt",
+    "/tmp/cybersiem_tor_exit_nodes.txt",  # noqa: S108
 )
 DEFAULT_TOR_CACHE_TTL_SECONDS = int(os.getenv("TOR_EXIT_NODES_CACHE_TTL_SECONDS", "21600"))
 
@@ -89,7 +88,7 @@ class TorExitNodeService:
 
     def _download_nodes(self) -> tuple[set[str], datetime | None, str | None]:
         try:
-            with urlopen(self.source_url, timeout=5) as response:
+            with urlopen(self.source_url, timeout=5) as response:  # noqa: S310
                 payload = response.read().decode("utf-8")
         except (TimeoutError, URLError, OSError):
             return set(), None, "tor_list_download_failed"

@@ -189,6 +189,7 @@ class DashboardStats(BaseModel):
 # Angular UI (frontend/) contracts
 # ---------------------------------------------------------------------------
 
+
 class LoginRequest(BaseModel):
     username: str = ""
     password: str = ""

@@ -6,7 +6,6 @@ from datetime import timedelta
 from src.core.http_models import DetectionAlert, HTTPLogEvent
 from src.security_engine.detectors.base import Detector
 
-
 _GENERIC_BOT_PREFIXES = (
     "python-requests",
     "curl/",

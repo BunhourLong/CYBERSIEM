@@ -170,7 +170,10 @@ a {
   color: var(--zinc-300);
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 150ms, color 150ms, border-color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms,
+    border-color 150ms;
 }
 
 .btn:hover:not(:disabled) {
@@ -300,14 +303,30 @@ a {
   white-space: nowrap;
 }
 
-.tone-red { color: var(--red-300); }
-.tone-orange { color: var(--orange-300); }
-.tone-amber { color: var(--amber-300); }
-.tone-emerald { color: var(--emerald-300); }
-.tone-bright { color: var(--zinc-100); }
-.tone-strong { color: var(--zinc-200); }
-.tone-soft { color: var(--zinc-300); }
-.tone-muted { color: var(--zinc-400); }
+.tone-red {
+  color: var(--red-300);
+}
+.tone-orange {
+  color: var(--orange-300);
+}
+.tone-amber {
+  color: var(--amber-300);
+}
+.tone-emerald {
+  color: var(--emerald-300);
+}
+.tone-bright {
+  color: var(--zinc-100);
+}
+.tone-strong {
+  color: var(--zinc-200);
+}
+.tone-soft {
+  color: var(--zinc-300);
+}
+.tone-muted {
+  color: var(--zinc-400);
+}
 
 .visually-hidden {
   position: absolute;

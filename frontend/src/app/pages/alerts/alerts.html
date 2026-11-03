@@ -5,7 +5,9 @@
     <div class="panel__header">
       <h2 class="panel__title">Alerts</h2>
       <div class="alerts__meta">
-        <p class="alerts__live">{{ view()?.blocked_ip_count ?? 0 }} blocked IPs — live, refreshes every 5s</p>
+        <p class="alerts__live">
+          {{ view()?.blocked_ip_count ?? 0 }} blocked IPs — live, refreshes every 5s
+        </p>
         @if (session.isAdmin()) {
           <button
             type="button"
@@ -23,12 +25,25 @@
     @if (actionError(); as message) {
       <div class="notice alerts__error" role="alert">
         <span>{{ message }}</span>
-        <button type="button" class="alerts__dismiss" aria-label="Dismiss" (click)="actionError.set(null)">×</button>
+        <button
+          type="button"
+          class="alerts__dismiss"
+          aria-label="Dismiss"
+          (click)="actionError.set(null)"
+        >
+          ×
+        </button>
       </div>
     }
 
     <!-- Filter bar -->
-    <form class="filters" [formGroup]="filterForm" (ngSubmit)="applyFilters()" role="search" aria-label="Filter alerts">
+    <form
+      class="filters"
+      [formGroup]="filterForm"
+      (ngSubmit)="applyFilters()"
+      role="search"
+      aria-label="Filter alerts"
+    >
       <div class="field">
         <label class="field__label" for="filter-type">Type</label>
         <select id="filter-type" class="control" formControlName="type">
@@ -80,7 +95,9 @@
       </div>
 
       @if (isFiltered()) {
-        <button type="button" class="btn filters__clear" (click)="clearFilters()">Clear filters</button>
+        <button type="button" class="btn filters__clear" (click)="clearFilters()">
+          Clear filters
+        </button>
       }
 
       <p class="filters__count" aria-live="polite">
@@ -128,14 +145,18 @@
                 </button>
                 {{ alert.id }}
               </td>
-              <td class="nowrap tone-muted">{{ alert.created_at | date: 'yyyy-MM-dd HH:mm:ss' : 'UTC' }}</td>
+              <td class="nowrap tone-muted">
+                {{ alert.created_at | date: 'yyyy-MM-dd HH:mm:ss' : 'UTC' }}
+              </td>
               <td class="nowrap mono tone-soft">{{ alert.ip }}</td>
               <td [class]="'tone-' + row.stateTone">{{ row.stateLabel }}</td>
               <td class="nowrap tone-strong">{{ formatScore(alert.current_score) }}</td>
               <td class="mono tone-soft">{{ alert.endpoint }}</td>
               <td class="tone-soft">{{ alert.type }}</td>
               <td [class]="'tone-' + row.severityTone">{{ alert.severity }}</td>
-              <td class="nowrap alert-row__confidence" [class]="'tone-' + row.confidenceTone">{{ alert.confidence }}%</td>
+              <td class="nowrap alert-row__confidence" [class]="'tone-' + row.confidenceTone">
+                {{ alert.confidence }}%
+              </td>
               <td [class]="'tone-' + row.statusTone">{{ alert.status }}</td>
               <td class="tone-soft alert-row__message">{{ alert.message }}</td>
               <td class="alert-row__actions" (click)="$event.stopPropagation()">
@@ -262,7 +283,9 @@
                       @if (row.location) {
                         <p class="details__value">{{ row.location }}</p>
                       } @else if (row.nonPublicScope) {
-                        <p class="details__value details__value--muted">Unavailable for {{ row.nonPublicScope }} IPs</p>
+                        <p class="details__value details__value--muted">
+                          Unavailable for {{ row.nonPublicScope }} IPs
+                        </p>
                       } @else {
                         <p class="details__value details__value--muted">Unavailable</p>
                       }
@@ -289,11 +312,16 @@
                       <p class="details__label">Alert hold</p>
                       @if (alert.alert_hold_active) {
                         <p class="details__value details__value--alarm">
-                          Active — {{ row.pendingReview }} alert(s) pending review ({{ alert.unresolved_alert_count }}
-                          unresolved, {{ alert.malicious_alert_count }} malicious, {{ alert.safe_alert_count }} safe)
+                          Active — {{ row.pendingReview }} alert(s) pending review ({{
+                            alert.unresolved_alert_count
+                          }}
+                          unresolved, {{ alert.malicious_alert_count }} malicious,
+                          {{ alert.safe_alert_count }} safe)
                         </p>
                       } @else if (alert.safe_alert_count > 0) {
-                        <p class="details__value tone-emerald">Cleared — all {{ alert.safe_alert_count }} alert(s) safe</p>
+                        <p class="details__value tone-emerald">
+                          Cleared — all {{ alert.safe_alert_count }} alert(s) safe
+                        </p>
                       } @else {
                         <p class="details__value tone-emerald">Inactive</p>
                       }
@@ -307,7 +335,9 @@
                       @if (alert.accuracy_radius_km) {
                         <p class="details__value">{{ alert.accuracy_radius_km }} km radius</p>
                       } @else if (row.nonPublicScope) {
-                        <p class="details__value details__value--muted">Skipped for {{ row.nonPublicScope }} IP</p>
+                        <p class="details__value details__value--muted">
+                          Skipped for {{ row.nonPublicScope }} IP
+                        </p>
                       } @else {
                         <p class="details__value details__value--muted">Unknown</p>
                       }
@@ -322,7 +352,9 @@
                     </div>
                     <div>
                       <p class="details__label">Block count / streak</p>
-                      <p class="details__value">{{ alert.block_count }} blocks, {{ alert.offense_streak }} streak</p>
+                      <p class="details__value">
+                        {{ alert.block_count }} blocks, {{ alert.offense_streak }} streak
+                      </p>
                     </div>
                   </div>
 
@@ -357,7 +389,9 @@
                     @if (alert.reputation_reasons.length) {
                       <p class="details__value">{{ alert.reputation_reasons.join(', ') }}</p>
                     } @else {
-                      <p class="details__value details__value--muted">No active reputation reasons.</p>
+                      <p class="details__value details__value--muted">
+                        No active reputation reasons.
+                      </p>
                     }
                   </div>
                 </td>

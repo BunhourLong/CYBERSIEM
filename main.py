@@ -1,8 +1,9 @@
 from scapy.all import sniff
+
 from src.collectors.local.scapy_sniffer import packet_to_event
+from src.core.geo import enrich_geo
 from src.ids.engine import classify_event
 from src.storage.mongo import save_event
-from src.core.geo import enrich_geo
 
 
 def handle_packet(packet):
@@ -11,14 +12,10 @@ def handle_packet(packet):
         return
 
     event = classify_event(event)
-    event = enrich_geo(event)  
+    event = enrich_geo(event)
     save_event(event)
 
-    print(
-        f"[{event.classification.upper()}] "
-        f"{event.src_ip} ({event.country}) → "
-        f"{event.dst_ip}"
-    )
+    print(f"[{event.classification.upper()}] {event.src_ip} ({event.country}) → {event.dst_ip}")
 
 
 def main():

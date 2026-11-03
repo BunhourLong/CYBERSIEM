@@ -2,7 +2,8 @@
 
 export type Role = 'readonly' | 'analyst' | 'admin';
 export type AlertStatus = 'unresolved' | 'safe' | 'malicious';
-export type IpControlAction = 'force_unblock' | 'trust' | 'clear_trust' | 'suppress_auto_block' | 'clear_override';
+export type IpControlAction =
+  'force_unblock' | 'trust' | 'clear_trust' | 'suppress_auto_block' | 'clear_override';
 
 export interface CurrentUser {
   username: string;

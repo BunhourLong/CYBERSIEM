@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from collections import Counter
 from datetime import datetime, timezone
-from math import ceil
-from math import isfinite
-from pathlib import Path
 from ipaddress import ip_address
+from math import ceil, isfinite
+from pathlib import Path
 from typing import TypeVar
 from urllib.parse import parse_qs
 
@@ -16,6 +16,16 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 
+from src.api.auth import (
+    SESSION_COOKIE,
+    SESSION_TTL,
+    UserSession,
+    create_session_cookie,
+    get_current_user,
+    hash_password,
+    validate_password,
+    verify_password,
+)
 from src.api.schemas import (
     AlertResponse,
     AlertsPerHour,
@@ -28,9 +38,9 @@ from src.api.schemas import (
     DashboardStats,
     DashboardViewResponse,
     DeleteAlertsResponse,
+    IngestedAlertResponse,
     IngestEventRequest,
     IngestEventResponse,
-    IngestedAlertResponse,
     IPControlRequest,
     LoginRequest,
     MapPointResponse,
@@ -39,21 +49,9 @@ from src.api.schemas import (
     UpdateAlertStatusRequest,
 )
 from src.core.geo import describe_ip_scope, lookup_ip_location
-from src.api.auth import (
-    UserSession,
-    MIN_PASSWORD_LENGTH,
-    SESSION_COOKIE,
-    SESSION_TTL,
-    create_session_cookie,
-    get_current_user,
-    hash_password,
-    validate_password,
-    verify_password,
-)
-import os
 from src.core.http_models import DetectionAlert, HTTPLogEvent
-from src.security_engine.engine import SecurityEngine
 from src.security_engine.enforcement_service import EnforcementService
+from src.security_engine.engine import SecurityEngine
 from src.security_engine.intelligence import ASNResolver
 from src.security_engine.repository import SecurityRepository
 
@@ -69,8 +67,7 @@ asn_resolver = ASNResolver()
 # Compiled Angular app (frontend/). The api Docker image builds it; for local
 # runs, `npm run build` inside frontend/ or point FRONTEND_DIST_DIR elsewhere.
 FRONTEND_DIST_DIR = Path(
-    os.getenv("FRONTEND_DIST_DIR")
-    or Path(__file__).resolve().parents[2] / "frontend" / "dist" / "cappa" / "browser"
+    os.getenv("FRONTEND_DIST_DIR") or Path(__file__).resolve().parents[2] / "frontend" / "dist" / "cappa" / "browser"
 )
 
 DEFAULT_ALERT_LIMIT = 100
@@ -99,6 +96,7 @@ async def add_security_headers(request: Request, call_next):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
         response.headers["Pragma"] = "no-cache"
     return response
+
 
 # Pre-computed dummy hash — verify_password is always called so invalid usernames
 # take the same time as valid ones (prevents username enumeration via timing).
@@ -184,7 +182,7 @@ def _serialize_blocked_ip(record: dict) -> BlockedIPResponse:
     payload["alert_hold_active"] = bool(payload.get("alert_hold_active", False))
     unresolved = int(payload.get("unresolved_alert_count") or 0)
     malicious = int(payload.get("malicious_alert_count") or 0)
-    payload["unblock_eligible"] = (unresolved == 0 and malicious == 0)
+    payload["unblock_eligible"] = unresolved == 0 and malicious == 0
     payload["reputation_reasons"] = list(payload.get("reputation_reasons") or [])
     payload["block_countdown_seconds"] = _seconds_until(payload.get("blocked_until"))
     payload["cooldown_countdown_seconds"] = _seconds_until(payload.get("cooldown_until"))
@@ -240,9 +238,9 @@ def _require_admin(request: Request) -> tuple[UserSession | None, object]:
 # ---------------------------------------------------------------------------
 # Login lockout (in-memory, per-username and per-IP, fixed window)
 # ---------------------------------------------------------------------------
-_MAX_LOGIN_FAILURES = 5    # per account
-_IP_MAX_FAILURES = 20      # per source IP (covers credential-spray across accounts)
-_LOCKOUT_SECONDS = 300     # 5 minutes for both windows
+_MAX_LOGIN_FAILURES = 5  # per account
+_IP_MAX_FAILURES = 20  # per source IP (covers credential-spray across accounts)
+_LOCKOUT_SECONDS = 300  # 5 minutes for both windows
 
 
 # username -> (fail_count, first_failure_timestamp)
@@ -295,6 +293,7 @@ def _clear_lockout(username: str) -> None:
 # ---------------------------------------------------------------------------
 # Audit logging
 # ---------------------------------------------------------------------------
+
 
 def _client_ip(request: Request) -> str | None:
     xff = request.headers.get("x-forwarded-for")
@@ -363,9 +362,7 @@ async def login(request: Request):
 
     _clear_lockout(username)
     _audit(username, "login_success", None, request)
-    response = JSONResponse(
-        CurrentUserResponse(username=user["username"], role=user["role"]).model_dump()
-    )
+    response = JSONResponse(CurrentUserResponse(username=user["username"], role=user["role"]).model_dump())
     cookie = create_session_cookie(user["id"], secret)
     secure_flag = os.getenv("SESSION_SECURE", "").lower() in ("1", "true", "yes")
     response.set_cookie(
@@ -431,8 +428,7 @@ def _build_dashboard_stats(hours: int) -> DashboardStats:
             for row in repository.get_top_ips_by_alert_count(limit=10, hours=hours)
         ],
         alerts_per_hour=[
-            AlertsPerHour(hour=row["hour"], count=row["count"])
-            for row in repository.get_alerts_per_hour(hours=hours)
+            AlertsPerHour(hour=row["hour"], count=row["count"]) for row in repository.get_alerts_per_hour(hours=hours)
         ],
         hours_window=hours,
     )
@@ -622,6 +618,7 @@ def startup() -> None:
 
 def _warn_insecure_config() -> None:
     import sys as _sys
+
     secret = os.getenv("SESSION_SECRET", "change-me")
     if secret in _KNOWN_BAD_SECRETS:
         print(
@@ -633,6 +630,7 @@ def _warn_insecure_config() -> None:
 
 def _seed_default_admin() -> None:
     import sys as _sys
+
     admin_user = os.getenv("ADMIN_USERNAME", "")
     admin_pass = os.getenv("ADMIN_PASSWORD", "")
     if not admin_user or not admin_pass:
@@ -673,6 +671,7 @@ def health():
 # Angular UI: client-side routes all load the same shell
 # ---------------------------------------------------------------------------
 
+
 @app.get("/login", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)
 @app.get("/denied", response_class=HTMLResponse)
@@ -712,6 +711,7 @@ def alerts_page(
 # Angular UI: JSON endpoints
 # ---------------------------------------------------------------------------
 
+
 @app.get("/api/auth/me", response_model=CurrentUserResponse)
 def current_user(request: Request):
     session, err = _require_user(request)
@@ -737,9 +737,7 @@ def dashboard_view(request: Request, limit: int = DEFAULT_ALERT_LIMIT):
         ),
         state_counts=repository.count_ip_states(),
         blocked_ips=[_serialize_blocked_ip(record) for record in repository.list_blocked_ips()],
-        top_offenders=[
-            _serialize_blocked_ip(record) for record in repository.list_top_ip_reputations(limit=10)
-        ],
+        top_offenders=[_serialize_blocked_ip(record) for record in repository.list_top_ip_reputations(limit=10)],
         recent_transitions=repository.list_recent_reputation_transitions(limit=20),
     )
 

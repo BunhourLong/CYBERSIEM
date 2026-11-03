@@ -6,23 +6,44 @@
     </div>
 
     <nav class="header__nav" aria-label="Main">
-      <a class="btn" routerLink="/dashboard" routerLinkActive="is-active" ariaCurrentWhenActive="page">
+      <a
+        class="btn"
+        routerLink="/dashboard"
+        routerLinkActive="is-active"
+        ariaCurrentWhenActive="page"
+      >
         Dashboard
       </a>
 
       @if (minimal()) {
-        <button type="button" class="btn header__signout" [disabled]="signingOut()" (click)="signOut()">
+        <button
+          type="button"
+          class="btn header__signout"
+          [disabled]="signingOut()"
+          (click)="signOut()"
+        >
           Sign out
         </button>
       } @else {
-        <a class="btn" routerLink="/alerts" routerLinkActive="is-active" ariaCurrentWhenActive="page">Alerts</a>
+        <a
+          class="btn"
+          routerLink="/alerts"
+          routerLinkActive="is-active"
+          ariaCurrentWhenActive="page"
+          >Alerts</a
+        >
 
         <div class="header__user">
           @if (session.user(); as user) {
             <span class="mono header__username">{{ user.username }}</span>
             <span class="role-badge" [class]="'role-badge--' + user.role">{{ user.role }}</span>
           }
-          <button type="button" class="btn header__signout" [disabled]="signingOut()" (click)="signOut()">
+          <button
+            type="button"
+            class="btn header__signout"
+            [disabled]="signingOut()"
+            (click)="signOut()"
+          >
             Sign out
           </button>
         </div>

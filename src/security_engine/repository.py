@@ -12,7 +12,6 @@ from psycopg.rows import dict_row
 from src.core.http_models import DetectionAlert, HTTPLogEvent
 from src.security_engine.enforcement import IPReputationEvaluation, ReputationTransition
 
-
 DEFAULT_DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://cybersiem:cybersiem@localhost:5432/cybersiem",
@@ -218,24 +217,14 @@ class SecurityRepository:
                 cur.execute(
                     "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS offense_streak INTEGER NOT NULL DEFAULT 0"
                 )
-                cur.execute(
-                    "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ"
-                )
-                cur.execute(
-                    "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS last_alert_at TIMESTAMPTZ"
-                )
-                cur.execute(
-                    "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS blocked_until TIMESTAMPTZ"
-                )
-                cur.execute(
-                    "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS cooldown_until TIMESTAMPTZ"
-                )
+                cur.execute("ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ")
+                cur.execute("ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS last_alert_at TIMESTAMPTZ")
+                cur.execute("ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS blocked_until TIMESTAMPTZ")
+                cur.execute("ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS cooldown_until TIMESTAMPTZ")
                 cur.execute(
                     "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS whitelist BOOLEAN NOT NULL DEFAULT FALSE"
                 )
-                cur.execute(
-                    "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS analyst_override VARCHAR(32)"
-                )
+                cur.execute("ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS analyst_override VARCHAR(32)")
                 cur.execute(
                     "ALTER TABLE ip_reputations ADD COLUMN IF NOT EXISTS reputation_reasons JSONB NOT NULL DEFAULT '[]'::jsonb"
                 )
@@ -271,9 +260,7 @@ class SecurityRepository:
                         OR COALESCE(malicious_count, 0) = 0
                     """
                 )
-                cur.execute(
-                    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS confidence INTEGER NOT NULL DEFAULT 50"
-                )
+                cur.execute("ALTER TABLE alerts ADD COLUMN IF NOT EXISTS confidence INTEGER NOT NULL DEFAULT 50")
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS users (
@@ -286,9 +273,7 @@ class SecurityRepository:
                     )
                     """
                 )
-                cur.execute(
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(16) NOT NULL DEFAULT 'readonly'"
-                )
+                cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(16) NOT NULL DEFAULT 'readonly'")
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS audit_logs (
@@ -301,12 +286,8 @@ class SecurityRepository:
                     )
                     """
                 )
-                cur.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at DESC)"
-                )
-                cur.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs (actor)"
-                )
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at DESC)")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs (actor)")
                 cur.execute(
                     """
                     CREATE INDEX IF NOT EXISTS idx_events_occurred_at
@@ -337,9 +318,7 @@ class SecurityRepository:
                     ON alerts (status)
                     """
                 )
-                cur.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_alerts_type ON alerts (type)"
-                )
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_alerts_type ON alerts (type)")
                 cur.execute(
                     """
                     CREATE INDEX IF NOT EXISTS idx_alerts_ip_created_at
@@ -1126,7 +1105,7 @@ class SecurityRepository:
                         (actor, action, target, source_ip),
                     )
                 conn.commit()
-        except Exception:  # noqa: BLE001 — audit failures must never break the caller
+        except Exception:  # noqa: BLE001, S110
             pass
 
     def list_audit_events(self, limit: int = 100) -> list[dict]:

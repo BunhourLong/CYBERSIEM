@@ -6,7 +6,6 @@ from urllib.parse import unquote_plus
 from src.core.http_models import DetectionAlert, HTTPLogEvent
 from src.security_engine.detectors.base import Detector
 
-
 XSS_PATTERNS = [
     re.compile(r"(?i)<script[\s>]"),
     re.compile(r"(?i)</script\s*>"),

@@ -13,7 +13,13 @@ const ATTACK_DESCRIPTIONS: Record<string, string> = {
 };
 
 /** Metadata keys surfaced as "evidence" rather than in the generic metadata grid. */
-const EVIDENCE_KEYS = new Set(['payload', 'query', 'request_target', 'matched_patterns', 'sample_uas']);
+const EVIDENCE_KEYS = new Set([
+  'payload',
+  'query',
+  'request_target',
+  'matched_patterns',
+  'sample_uas',
+]);
 
 export function describeAttack(type: string): string {
   return ATTACK_DESCRIPTIONS[type] ?? 'Suspicious activity detected.';
@@ -52,7 +58,9 @@ function formatMetadataValue(value: unknown): string {
   return String(value);
 }
 
-export function metadataEntries(metadata: Record<string, unknown>): { key: string; value: string }[] {
+export function metadataEntries(
+  metadata: Record<string, unknown>,
+): { key: string; value: string }[] {
   return Object.entries(metadata)
     .filter(([key]) => !EVIDENCE_KEYS.has(key))
     .map(([key, value]) => ({ key: key.replaceAll('_', ' '), value: formatMetadataValue(value) }));

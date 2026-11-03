@@ -9,7 +9,9 @@ describe('alert insights', () => {
 
   it('falls back to matched patterns and sampled user agents', () => {
     expect(observedEvidence({ matched_patterns: ['union', 'select'] })).toBe('union, select');
-    expect(observedEvidence({ matched_patterns: [], sample_uas: ['curl', 'wget'] })).toBe('UAs: curl, wget');
+    expect(observedEvidence({ matched_patterns: [], sample_uas: ['curl', 'wget'] })).toBe(
+      'UAs: curl, wget',
+    );
     expect(observedEvidence({ window_seconds: 60 })).toBeNull();
   });
 

@@ -7,7 +7,9 @@
       <div class="panel__header">
         <h2 class="panel__title">Analytics <span class="dashboard__window">— last 24 h</span></h2>
         @if (loadFailed()) {
-          <span class="dashboard__stale" role="status">Refresh failed — showing last loaded data</span>
+          <span class="dashboard__stale" role="status"
+            >Refresh failed — showing last loaded data</span
+          >
         }
       </div>
 
@@ -21,7 +23,9 @@
                   <span class="bars__name" [title]="row.type">{{ row.label }}</span>
                   <span class="tone-muted">{{ row.count }}</span>
                 </div>
-                <div class="bar"><div class="bar__fill bar__fill--amber" [style.width.%]="row.percent"></div></div>
+                <div class="bar">
+                  <div class="bar__fill bar__fill--amber" [style.width.%]="row.percent"></div>
+                </div>
               </li>
             } @empty {
               <li class="dashboard__empty">No alerts in last 24h.</li>
@@ -36,10 +40,17 @@
               <li>
                 <div class="bars__label">
                   <span [class]="'tone-' + row.tone">{{ row.severity }}</span>
-                  <span class="tone-muted">{{ row.count }} <span class="dashboard__faint">({{ row.percent }}%)</span></span>
+                  <span class="tone-muted"
+                    >{{ row.count }}
+                    <span class="dashboard__faint">({{ row.percent }}%)</span></span
+                  >
                 </div>
                 <div class="bar">
-                  <div class="bar__fill" [class]="'bar__fill--' + row.bar" [style.width.%]="row.percent"></div>
+                  <div
+                    class="bar__fill"
+                    [class]="'bar__fill--' + row.bar"
+                    [style.width.%]="row.percent"
+                  ></div>
                 </div>
               </li>
             } @empty {
@@ -64,7 +75,11 @@
                   </span>
                 </div>
                 <div class="bar bar--thin">
-                  <div class="bar__fill" [class]="'bar__fill--' + row.bar" [style.width.%]="row.percent"></div>
+                  <div
+                    class="bar__fill"
+                    [class]="'bar__fill--' + row.bar"
+                    [style.width.%]="row.percent"
+                  ></div>
                 </div>
               </li>
             } @empty {
@@ -171,7 +186,11 @@
                     <td class="tone-bright">{{ formatScore(offender.current_score) }}</td>
                     <td class="tone-soft nowrap">{{ offenderWindow(offender) }}</td>
                     <td class="tone-muted">
-                      {{ offender.reputation_reasons.length ? offender.reputation_reasons.join(', ') : 'No active reasons' }}
+                      {{
+                        offender.reputation_reasons.length
+                          ? offender.reputation_reasons.join(', ')
+                          : 'No active reasons'
+                      }}
                     </td>
                   </tr>
                 } @empty {
@@ -208,14 +227,17 @@
               <tbody>
                 @for (transition of v.recent_transitions; track transition.id) {
                   <tr>
-                    <td class="tone-muted nowrap">{{ transition.created_at | date: 'yyyy-MM-dd HH:mm:ss' : 'UTC' }}</td>
+                    <td class="tone-muted nowrap">
+                      {{ transition.created_at | date: 'yyyy-MM-dd HH:mm:ss' : 'UTC' }}
+                    </td>
                     <td class="mono tone-strong">{{ transition.ip }}</td>
                     <td class="tone-soft">
                       {{ transition.old_state }} -> {{ transition.new_state }}
                       <div class="dashboard__source">{{ transition.manual_or_auto }}</div>
                     </td>
                     <td class="tone-soft nowrap">
-                      {{ formatScore(transition.score_before) }} -> {{ formatScore(transition.score_after) }}
+                      {{ formatScore(transition.score_before) }} ->
+                      {{ formatScore(transition.score_after) }}
                     </td>
                     <td class="tone-muted">{{ humanize(transition.trigger_reason) }}</td>
                   </tr>

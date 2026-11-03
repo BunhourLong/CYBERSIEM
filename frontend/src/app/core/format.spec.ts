@@ -1,4 +1,12 @@
-import { enforcementWindow, formatScore, humanize, joinPresent, percentOf, severityTone, stateTone } from './format';
+import {
+  enforcementWindow,
+  formatScore,
+  humanize,
+  joinPresent,
+  percentOf,
+  severityTone,
+  stateTone,
+} from './format';
 
 describe('format helpers', () => {
   it('humanize replaces every underscore and handles null or undefined', () => {
@@ -58,22 +66,35 @@ describe('format helpers', () => {
   });
 
   it('enforcementWindow returns null for zero or null countdowns', () => {
-    expect(enforcementWindow({ block_countdown_seconds: 0, cooldown_countdown_seconds: 0 })).toBeNull();
-    expect(enforcementWindow({ block_countdown_seconds: null, cooldown_countdown_seconds: null })).toBeNull();
-    expect(enforcementWindow({ block_countdown_seconds: -5, cooldown_countdown_seconds: null })).toBeNull();
+    expect(
+      enforcementWindow({ block_countdown_seconds: 0, cooldown_countdown_seconds: 0 }),
+    ).toBeNull();
+    expect(
+      enforcementWindow({ block_countdown_seconds: null, cooldown_countdown_seconds: null }),
+    ).toBeNull();
+    expect(
+      enforcementWindow({ block_countdown_seconds: -5, cooldown_countdown_seconds: null }),
+    ).toBeNull();
   });
 
   it('enforcementWindow shows the block countdown with the label before cooldown', () => {
-    expect(enforcementWindow({ block_countdown_seconds: 30, cooldown_countdown_seconds: null }, 'blocked ')).toBe(
-      'blocked 30s',
+    expect(
+      enforcementWindow(
+        { block_countdown_seconds: 30, cooldown_countdown_seconds: null },
+        'blocked ',
+      ),
+    ).toBe('blocked 30s');
+    expect(enforcementWindow({ block_countdown_seconds: 30, cooldown_countdown_seconds: 15 })).toBe(
+      '30s',
     );
-    expect(enforcementWindow({ block_countdown_seconds: 30, cooldown_countdown_seconds: 15 })).toBe('30s');
   });
 
   it('enforcementWindow shows cooldown without the block label when no block is active', () => {
-    expect(enforcementWindow({ block_countdown_seconds: 0, cooldown_countdown_seconds: 15 }, 'blocked ')).toBe(
-      'cooldown 15s',
-    );
-    expect(enforcementWindow({ block_countdown_seconds: null, cooldown_countdown_seconds: 10 })).toBe('cooldown 10s');
+    expect(
+      enforcementWindow({ block_countdown_seconds: 0, cooldown_countdown_seconds: 15 }, 'blocked '),
+    ).toBe('cooldown 15s');
+    expect(
+      enforcementWindow({ block_countdown_seconds: null, cooldown_countdown_seconds: 10 }),
+    ).toBe('cooldown 10s');
   });
 });

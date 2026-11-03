@@ -88,6 +88,24 @@ watch_job() {
   fi
   [ -n "$surface" ] || echo "Couldn't open a cmux split, so this job runs unseen." >&2
   wait "$job" || status=$?
+
+  # `run --attach` can exit before the last step's events arrive, so take the result from the saved session.
+  if [ "$status" -ne 0 ] || [ -z "$session" ] || grep -q '"type":"error"' "$events"; then
+    return
+  fi
+  waited=0
+  until session_finished || [ "$waited" -ge 120 ]; do
+    sleep 1
+    waited=$((waited + 1))
+  done
+  jq -c '.messages[] | select(.info.role == "assistant") | .parts[]
+    | {text: "text", "step-finish": "step_finish", tool: "tool_use"}[.type] as $type
+    | select($type) | {type: $type, part: .}' "$work/session.json" > "$events"
+}
+
+session_finished() {
+  (cd "$work/repo" && OPENCODE_DISABLE_CLAUDE_CODE=1 opencode export "$session" > "$work/session.json" 2> /dev/null) || return 1
+  jq -e '.messages[-1].info.finish // "" | . != "" and . != "tool-calls"' "$work/session.json" > /dev/null 2>&1
 }
 
 status=0

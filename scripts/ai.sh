@@ -39,12 +39,8 @@ work="$(mktemp -d)"
 server=""
 surface=""
 cleanup() {
-  if [ -n "$surface" ]; then
-    # Keep a watched job readable for 10 minutes after it ends.
-    # shortcut: the kill could hit a reused PID if the server died early, upgrade if that ever happens.
-    nohup bash -c 'sleep 600; cmux close-surface --surface "$1"; kill "$2"; rm -rf "$3"' _ "$surface" "$server" "$work" > /dev/null 2>&1 &
-    return
-  fi
+  # A job's split closes when it ends: its reply stays in .scan/. With no surface, cmux would close the focused pane.
+  [ -z "$surface" ] || cmux close-surface --surface "$surface" --force > /dev/null 2>&1 || true
   [ -z "$server" ] || kill "$server" 2> /dev/null || true
   rm -rf "$work"
 }

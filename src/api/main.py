@@ -8,10 +8,10 @@ from datetime import datetime, timezone
 from ipaddress import ip_address
 from math import ceil, isfinite
 from pathlib import Path
-from typing import TypeVar
+from typing import Annotated, TypeVar
 from urllib.parse import parse_qs
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
@@ -55,7 +55,15 @@ from src.security_engine.engine import SecurityEngine
 from src.security_engine.intelligence import ASNResolver
 from src.security_engine.repository import SecurityRepository
 
-app = FastAPI(title="CyberSIEM Alert API", version="0.1.0")
+# Interactive docs expose the full API surface: off unless explicitly enabled for local dev.
+_DOCS_ON = os.getenv("API_DOCS_ENABLED", "").lower() == "true"
+app = FastAPI(
+    title="CyberSIEM Alert API",
+    version="0.1.0",
+    docs_url="/docs" if _DOCS_ON else None,
+    redoc_url="/redoc" if _DOCS_ON else None,
+    openapi_url="/openapi.json" if _DOCS_ON else None,
+)
 repository = SecurityRepository()
 enforcement_service = EnforcementService(repository=repository)
 security_engine = SecurityEngine(
@@ -72,6 +80,9 @@ FRONTEND_DIST_DIR = Path(
 
 DEFAULT_ALERT_LIMIT = 100
 DEFAULT_MAP_LIMIT = 200
+Limit = Annotated[int, Query(ge=1, le=1000)]
+Offset = Annotated[int, Query(ge=0, le=1_000_000)]
+Hours = Annotated[int, Query(ge=1, le=720)]
 MAX_MAP_SCAN_LIMIT = 2000
 
 # Known-bad SESSION_SECRET values that must be rejected in production
@@ -149,8 +160,8 @@ def _serialize_alert(alert: dict) -> AlertResponse:
 
 
 def _list_serialized_alerts(
-    limit: int = DEFAULT_ALERT_LIMIT,
-    offset: int = 0,
+    limit: Limit = DEFAULT_ALERT_LIMIT,
+    offset: Offset = 0,
     filter_type: str | None = None,
     filter_severity: str | None = None,
     filter_status: str | None = None,
@@ -682,8 +693,8 @@ def ui_page():
 @app.get("/alerts")
 def alerts_page(
     request: Request,
-    limit: int = DEFAULT_ALERT_LIMIT,
-    offset: int = 0,
+    limit: Limit = DEFAULT_ALERT_LIMIT,
+    offset: Offset = 0,
     type: str = "",
     severity: str = "",
     status: str = "",
@@ -721,7 +732,7 @@ def current_user(request: Request):
 
 
 @app.get("/api/ui/dashboard", response_model=DashboardViewResponse)
-def dashboard_view(request: Request, limit: int = DEFAULT_ALERT_LIMIT):
+def dashboard_view(request: Request, limit: Limit = DEFAULT_ALERT_LIMIT):
     _, err = _require_user(request)
     if err:
         return err
@@ -743,7 +754,7 @@ def dashboard_view(request: Request, limit: int = DEFAULT_ALERT_LIMIT):
 
 
 @app.get("/api/ui/map-points", response_model=list[MapPointResponse])
-def map_points_view(request: Request, limit: int = DEFAULT_MAP_LIMIT):
+def map_points_view(request: Request, limit: Limit = DEFAULT_MAP_LIMIT):
     _, err = _require_user(request)
     if err:
         return err
@@ -753,8 +764,8 @@ def map_points_view(request: Request, limit: int = DEFAULT_MAP_LIMIT):
 @app.get("/api/ui/alerts", response_model=AlertsViewResponse)
 def alerts_view(
     request: Request,
-    limit: int = DEFAULT_ALERT_LIMIT,
-    offset: int = 0,
+    limit: Limit = DEFAULT_ALERT_LIMIT,
+    offset: Offset = 0,
     type: str = "",
     severity: str = "",
     status: str = "",
@@ -782,14 +793,18 @@ def alerts_view(
 
 @app.get("/api/alerts", response_model=list[AlertResponse])
 def list_alerts(
-    limit: int = DEFAULT_ALERT_LIMIT,
-    offset: int = 0,
+    request: Request,
+    limit: Limit = DEFAULT_ALERT_LIMIT,
+    offset: Offset = 0,
     type: str = "",
     severity: str = "",
     status: str = "",
     ip: str = "",
     blocked_only: bool = False,
 ):
+    _, err = _require_analyst(request)
+    if err:
+        return err
     _refresh_reputation_views(trigger_reason="alerts_api_refresh")
     return _list_serialized_alerts(
         limit=limit,
@@ -803,7 +818,10 @@ def list_alerts(
 
 
 @app.get("/api/dashboard-stats", response_model=DashboardStats)
-def dashboard_stats(hours: int = 24):
+def dashboard_stats(request: Request, hours: Hours = 24):
+    _, err = _require_user(request)
+    if err:
+        return err
     return _build_dashboard_stats(hours=hours)
 
 
@@ -816,6 +834,7 @@ def list_blocked_ips(request: Request):
     return [_serialize_blocked_ip(record) for record in repository.list_blocked_ips()]
 
 
+# Temporary: unauthenticated, removed by T-003.
 @app.post("/ingest-event", response_model=IngestEventResponse, status_code=202)
 def ingest_event(payload: IngestEventRequest):
     event = _build_ingest_event(payload)
@@ -883,12 +902,18 @@ async def ip_controls(request: Request):
 
 
 @app.get("/map-data", response_model=list[MapPointResponse])
-def map_data(limit: int = DEFAULT_MAP_LIMIT):
+def map_data(request: Request, limit: Limit = DEFAULT_MAP_LIMIT):
+    _, err = _require_user(request)
+    if err:
+        return err
     return _build_map_points(limit)
 
 
 @app.get("/alerts/{alert_id}", response_model=AlertResponse)
-def get_alert(alert_id: int):
+def get_alert(alert_id: int, request: Request):
+    _, err = _require_analyst(request)
+    if err:
+        return err
     _refresh_reputation_views(trigger_reason="alert_detail_refresh")
     alert = repository.get_alert(alert_id)
     if not alert:
@@ -930,10 +955,11 @@ def delete_all_alerts(request: Request):
 
 
 @app.post("/block-ip", response_model=AlertResponse)
-def block_ip(payload: BlockIPRequest, request: Request):
+async def block_ip(request: Request):
     session, err = _require_analyst(request)
     if err:
         return err
+    payload = await _parse_payload(request, BlockIPRequest)
     _audit(session.username, "block_ip", payload.ip, request)
     alert = DetectionAlert(
         ip=payload.ip,

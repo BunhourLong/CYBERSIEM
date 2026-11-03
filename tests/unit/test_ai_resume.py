@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+BASH = shutil.which("bash") or "bash"
+SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "ai.sh"
+STEP = json.dumps(
+    {
+        "type": "step_finish",
+        "sessionID": "S1",
+        "part": {"cost": 0.01, "tokens": {"input": 1, "output": 1, "cache": {"read": 0}}},
+    }
+)
+TEXT = json.dumps({"type": "text", "sessionID": "S1", "part": {"text": "done"}})
+
+
+def _error(message: str) -> str:
+    return json.dumps({"type": "error", "sessionID": "S1", "error": {"data": {"message": message}}})
+
+
+def _ai(tmp_path: Path, stub_dir: Path, stub_body: str, **env_extra: str) -> tuple[subprocess.CompletedProcess, Path]:
+    """Run ai.sh in a throwaway repo with a stub opencode in place of the real one."""
+    stub = stub_dir / "opencode"
+    stub.write_text("#!/usr/bin/env bash\n" + stub_body)
+    stub.chmod(0o755)
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.test"]
+    (repo / ".gitignore").write_text(".scan\n")
+    for args in (["init", "-q"], ["add", "-A"], ["commit", "-qm", "x"]):
+        subprocess.run([*git, *args], cwd=repo, check=True)  # noqa: S603  # constant commands in a temp repo
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text("do it")
+
+    env = {**os.environ, "PATH": f"{stub_dir}:{os.environ['PATH']}", **env_extra}
+    env.pop("AI_WATCH", None)
+    done = subprocess.run(  # noqa: S603  # our own script with a stub opencode
+        [BASH, str(SCRIPT), "explore", str(prompt)], cwd=repo, env=env, capture_output=True, text=True, timeout=25
+    )
+    return done, repo
+
+
+def _run(tmp_path: Path, replies: list[str]) -> tuple[subprocess.CompletedProcess, list[str], Path]:
+    """Play back one reply per opencode call."""
+    stub_dir = tmp_path / "bin"
+    stub_dir.mkdir()
+    for index, reply in enumerate(replies):
+        (stub_dir / f"reply{index}").write_text(reply + "\n")
+    done, repo = _ai(
+        tmp_path,
+        stub_dir,
+        f'd="{stub_dir}"\n'
+        'n="$(cat "$d/count" 2>/dev/null || echo 0)"\n'
+        'echo "$*" >> "$d/calls"\n'
+        'echo $((n + 1)) > "$d/count"\n'
+        'cat "$d/reply$n"\n',
+    )
+    return done, (stub_dir / "calls").read_text().splitlines(), repo
+
+
+def test_tls_failure_resumes_the_same_session_with_continue(tmp_path):
+    good = f"{TEXT}\n{STEP}"
+    done, calls, repo = _run(tmp_path, [f"{STEP}\n{_error('EPROTO: The TLS handshake failed.')}", good])
+    assert done.returncode == 0, done.stderr
+    assert len(calls) == 2
+    assert "-s S1" in calls[1] and calls[1].endswith("continue")
+    assert (repo / ".scan/ai-explore.txt").read_text().strip() == "done"
+    # Spend from the failed attempt counts too, or the budget is understated.
+    assert len((repo / ".scan/ai-usage.tsv").read_text().splitlines()) == 2
+
+
+def test_gives_up_after_three_resumes(tmp_path):
+    bad = _error("EPROTO: The TLS handshake failed.")
+    done, calls, _ = _run(tmp_path, [bad] * 6)
+    assert done.returncode == 1
+    assert len(calls) == 4
+
+
+def test_a_hung_job_is_stopped_with_a_clear_error(tmp_path):
+    # At Go's usage limit, opencode logs the error and then never exits.
+    stub_dir = tmp_path / "bin"
+    stub_dir.mkdir()
+    done, _ = _ai(tmp_path, stub_dir, "exec sleep 30\n", AI_TIMEOUT="1")
+    assert done.returncode == 1
+    assert "usage limit" in done.stderr
+
+
+def test_other_errors_are_not_retried(tmp_path):
+    done, calls, repo = _run(tmp_path, [f"{STEP}\n{_error('Rate limit exceeded')}", TEXT])
+    assert done.returncode == 1
+    assert len(calls) == 1
+    assert "Rate limit exceeded" in done.stderr
+    assert len((repo / ".scan/ai-usage.tsv").read_text().splitlines()) == 1

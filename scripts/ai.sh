@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run one bounded job on an OpenCode Go model, like a subagent reached over the shell.
 # It works in a history-free clone of HEAD, so untracked private docs never reach the provider.
-# Usage: scripts/ai.sh <explore|write|tests|review|attack> <prompt-file>
+# Usage: scripts/ai.sh <explore|write|tests|review|attack> <prompt-file>. AI_MODEL overrides the model, AI_TIMEOUT the seconds per attempt.
 set -euo pipefail
 
 role="${1:-}"
@@ -10,8 +10,8 @@ case "$role" in
   explore) agent=reader; model=opencode-go/deepseek-v4.1-flash ;;
   write)   agent=writer; model=opencode-go/deepseek-v4.1-flash ;;
   tests)   agent=writer; model=opencode-go/claude-haiku-5-5 ;;
-  review)  agent=reader; model=opencode-go/glm-5.2 ;;
-  attack)  agent=reader; model=opencode-go/claude-haiku-5-5 ;;
+  review)  agent=reader; model=opencode-go/minimax-m3 ;;
+  attack)  agent=reader; model=opencode-go/minimax-m3 ;;
   *) echo "Usage: scripts/ai.sh <explore|write|tests|review|attack> <prompt-file>" >&2; exit 2 ;;
 esac
 model="${AI_MODEL:-$model}"
@@ -57,7 +57,7 @@ mv "$work/repo/.git" "$work/git"
 
 # AI_WATCH=1 shows the job's real OpenCode interface in a new cmux split. Run from inside cmux.
 watch_job() {
-  local url="" session="" waited=0 job
+  local waited=0 job
   openssl rand -hex 16 > "$work/password"
   OPENCODE_SERVER_PASSWORD="$(cat "$work/password")"
   export OPENCODE_SERVER_PASSWORD
@@ -72,7 +72,7 @@ watch_job() {
   done
   [ -n "$url" ] || { echo "opencode serve didn't start." >&2; status=1; return; }
 
-  OPENCODE_DISABLE_CLAUDE_CODE=1 opencode run --attach "$url" --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
+  opencode_run --attach "$url" --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
     > "$events" 2> "$errors" < /dev/null &
   job=$!
   waited=0
@@ -92,7 +92,11 @@ watch_job() {
   if [ "$status" -ne 0 ] || [ -z "$session" ] || grep -q '"type":"error"' "$events"; then
     return
   fi
-  waited=0
+  load_session
+}
+
+load_session() {
+  local waited=0
   until session_finished || [ "$waited" -ge 120 ]; do
     sleep 1
     waited=$((waited + 1))
@@ -109,15 +113,50 @@ session_finished() {
   jq -e '.messages[-1].info | .error == null and ((.finish // "") | . != "" and . != "tool-calls")' "$work/session.json" > /dev/null 2>&1
 }
 
+# At Go's usage limit opencode logs the error and never exits. An alarm survives exec, so it stops opencode itself.
+opencode_run() {
+  OPENCODE_DISABLE_CLAUDE_CODE=1 perl -e 'alarm shift; exec @ARGV or die' "${AI_TIMEOUT:-900}" opencode run "$@"
+}
+
+record_usage() {
+  jq -r --arg role "$role" --arg model "$model" \
+    'select(.type=="step_finish") | .part | [(now | todate), $role, $model, .cost, .tokens.input, .tokens.cache.read, .tokens.output] | @tsv' \
+    "$events" >> "$scan/ai-usage.tsv" 2> /dev/null || true
+}
+
 status=0
+url=""
+session=""
 # Claude config on this machine is private and adds tokens, so OpenCode shouldn't load it.
 if [ -n "${AI_WATCH:-}" ]; then
   watch_job
 else
-  OPENCODE_DISABLE_CLAUDE_CODE=1 opencode run --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
+  opencode_run --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
     > "$events" 2> "$errors" < /dev/null || status=$?
 fi
 
+# A dropped connection says nothing about the answer, so resume the same session instead of failing the job.
+resumes=0
+while [ "$resumes" -lt 3 ] && grep -qE 'EPROTO|ECONNRESET|TLS handshake' "$events" "$errors" 2> /dev/null; do
+  session="$(jq -r '.sessionID // empty' "$events" 2> /dev/null | head -n 1 || true)"
+  [ -n "$session" ] || break
+  record_usage
+  resumes=$((resumes + 1))
+  echo "Connection dropped, resuming session (try $resumes of 3)." >&2
+  status=0
+  opencode_run ${url:+--attach "$url"} --dir "$work/repo" -m "$model" --agent "$agent" -s "$session" --format json continue \
+    > "$events" 2> "$errors" < /dev/null || status=$?
+done
+# `run --attach` can exit before the last events arrive, so a resumed watched job also reads the saved session.
+if [ -n "$url" ] && [ "$resumes" -gt 0 ] && [ "$status" -eq 0 ] && ! grep -q '"type":"error"' "$events"; then
+  load_session
+fi
+
+record_usage
+if [ "$status" -eq 142 ]; then
+  echo "Stopped after ${AI_TIMEOUT:-900}s. Go's usage limit makes opencode hang, so check that first." >&2
+  exit 1
+fi
 api_error="$(jq -r 'select(.type=="error") | .error.data.message // .error.name' "$events" 2>/dev/null || echo "unreadable output")"
 if [ "$status" -ne 0 ] || [ -n "$api_error" ]; then
   echo "opencode failed: ${api_error:-exit $status}" >&2
@@ -126,9 +165,6 @@ if [ "$status" -ne 0 ] || [ -n "$api_error" ]; then
 fi
 
 jq -r 'select(.type=="text") | .part.text' "$events" > "$reply"
-jq -r --arg role "$role" --arg model "$model" \
-  'select(.type=="step_finish") | .part | [(now | todate), $role, $model, .cost, .tokens.input, .tokens.cache.read, .tokens.output] | @tsv' \
-  "$events" >> "$scan/ai-usage.tsv"
 [ -s "$reply" ] || { echo "opencode returned nothing" >&2; exit 1; }
 
 if [ "$agent" = writer ]; then

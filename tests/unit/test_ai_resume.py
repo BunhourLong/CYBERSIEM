@@ -136,3 +136,11 @@ def test_watched_job_resumes_when_only_the_saved_session_shows_the_drop(tmp_path
     assert len(calls) == 2
     assert "-s S1" in calls[1] and calls[1].endswith("continue")
     assert (repo / ".scan/ai-explore.txt").read_text().strip() == "done"
+
+
+def test_a_warning_on_stderr_does_not_resume_a_finished_job(tmp_path):
+    stub_dir = tmp_path / "bin"
+    stub_dir.mkdir()
+    done, _ = _ai(tmp_path, stub_dir, f"echo x >> {stub_dir}/calls\necho 'EPROTO: retrying' >&2\necho '{TEXT}'\n")
+    assert done.returncode == 0, done.stderr
+    assert len((stub_dir / "calls").read_text().splitlines()) == 1

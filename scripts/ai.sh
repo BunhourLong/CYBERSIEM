@@ -124,7 +124,7 @@ connection_dropped() {
   found="$({
     jq -r 'select(.type=="error") | .error.data.message // .error.name' "$events"
     jq -r '.messages[-1].info.error | .data.message // .name // empty' "$work/session.json"
-    cat "$errors"
+    [ "$status" -eq 0 ] || cat "$errors"
   } 2> /dev/null || true)"
   grep -qE 'EPROTO|ECONNRESET|TLS handshake' <<< "$found"
 }
@@ -152,6 +152,7 @@ while [ "$resumes" -lt 3 ] && connection_dropped; do
   session="${session:-$(jq -r '.sessionID // empty' "$events" 2> /dev/null | head -n 1 || true)}"
   [ -n "$session" ] || break
   # A watched job's saved session already holds every step, so counting here too would double them.
+  # shortcut: a watched resume that then fails loses the earlier attempt's usage, and `opencode stats` keeps the true total.
   [ -n "$url" ] || record_usage
   resumes=$((resumes + 1))
   echo "Connection dropped, resuming session (try $resumes of 3)." >&2

@@ -21,11 +21,11 @@ You orchestrate and decide. Workers do the work. Stay cheap: give workers paths 
 | Find code | `task ai -- explore <prompt-file>` | same |
 | Write code | `task ai -- write <prompt-file>` | `implementer` (Claude Sonnet) |
 | Review | `reviewer` (Claude Sonnet) | same, plus `task ai -- review <prompt-file>` |
-| Write tests | `task ai -- tests <prompt-file>` (Kimi K3.1 Pro) | `test-writer` (Claude Sonnet) |
+| Write tests | `task ai -- tests <prompt-file>` (Claude Haiku 5.5) | `test-writer` (Claude Sonnet) |
 | Run tests | `task brief -- check` | same |
-| Pentest | `task ai -- review` with an attacker prompt, for code changes | `pentester` (Claude Opus, `effort: high`) |
+| Pentest | `task ai -- attack` with an attacker prompt, for code changes | `pentester` (Claude Opus, `effort: high`) |
 
-Prompt files go in `.scan/` (ignored). `task ai` sees only committed code, so commit your work on the task branch before each call. For a review, tell it to read `REVIEW.diff`. Go writers can't run commands. `task ai` applies their patch to your working tree, and **you must read that diff before running tests**, because tests execute whatever was written. Keep a prompt under 200 words, and state its word limit. Never paste `docs/security/` or customer data into one. If a Go model fails or hits a limit, retry once with `AI_MODEL` (for tests: `AI_MODEL=opencode-go/glm-5.2`), then fall back to the Claude agents `explorer`, `chore`, `implementer` or `test-writer`.
+Prompt files go in `.scan/` (ignored). Inside cmux, prefix `AI_WATCH=1` so the job opens a split I can watch. `task ai` sees only committed code, so commit your work on the task branch before each call. For a review, tell it to read `REVIEW.diff`. Go writers can't run commands. `task ai` applies their patch to your working tree, and **you must read that diff before running tests**, because tests execute whatever was written. Keep a prompt under 200 words, and state its word limit. Never paste `docs/security/` or customer data into one. If a Go model fails or hits a limit, retry once with `AI_MODEL` (for tests: `AI_MODEL=opencode-go/kimi-k3.1-pro`), then fall back to the Claude agents `explorer`, `chore`, `implementer` or `test-writer`.
 
 ## Pipeline
 1. **Load.** Read the task file. `rg --no-ignore -l '<module>' docs/tasks`, then read only those files' "Learned" sections. If a 🔒 item is undecided, record it in `docs/STATE.md` and skip to the next unblocked task; stop if there's none. Don't guess a 🔒 decision.

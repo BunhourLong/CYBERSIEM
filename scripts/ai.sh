@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run one bounded job on an OpenCode Go model, like a subagent reached over the shell.
 # It works in a history-free clone of HEAD, so untracked private docs never reach the provider.
-# Usage: scripts/ai.sh <explore|write|tests|review> <prompt-file>
+# Usage: scripts/ai.sh <explore|write|tests|review|attack> <prompt-file>
 set -euo pipefail
 
 role="${1:-}"
@@ -9,9 +9,10 @@ prompt_file="${2:-}"
 case "$role" in
   explore) agent=reader; model=opencode-go/deepseek-v4.1-flash ;;
   write)   agent=writer; model=opencode-go/deepseek-v4.1-flash ;;
-  tests)   agent=writer; model=opencode-go/kimi-k3.1-pro ;;
-  review)  agent=reader; model=opencode-go/gemini-4-argon ;;
-  *) echo "Usage: scripts/ai.sh <explore|write|tests|review> <prompt-file>" >&2; exit 2 ;;
+  tests)   agent=writer; model=opencode-go/claude-haiku-5-5 ;;
+  review)  agent=reader; model=opencode-go/glm-5.2 ;;
+  attack)  agent=reader; model=opencode-go/claude-haiku-5-5 ;;
+  *) echo "Usage: scripts/ai.sh <explore|write|tests|review|attack> <prompt-file>" >&2; exit 2 ;;
 esac
 model="${AI_MODEL:-$model}"
 [ -s "$prompt_file" ] || { echo "Prompt file is missing or empty: $prompt_file" >&2; exit 2; }

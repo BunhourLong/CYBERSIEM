@@ -46,21 +46,21 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 - Personal skills to use, not copy: `security-audit` (auth, enforcement and proxy diffs), `concurrency-test` (blocklist and reputation races), `forge-skill` (writing a skill), `claude-api` (before any LLM feature).
 
 ## Model routing
-Provisional until T-052 tests the OpenCode Go models on this repo. Details: plan.md §10. Don't use Codex or ChatGPT.
+From T-052's bakeoff on this repo: one run per model, so a rough signal. Details: plan.md §10. Don't use Codex or ChatGPT.
 
 | Step | Low risk | High risk (auth, enforcement, scoring, client IP, proxy, parsing, audit) |
 |---|---|---|
 | Orchestrate, plan, judge findings | Claude Opus 5.5, high effort, main session | same |
 | Find code, chores | Go: DeepSeek V4.1 Flash | same |
 | Write code, apply fixes | Go: DeepSeek V4.1 Flash | Claude Sonnet, `implementer` |
-| Review the diff | Claude Sonnet, `reviewer` | same, plus Go: Gemini 4 Argon |
-| Write tests | Go: Kimi K3.1 Pro, then GLM-5.2 at its cap | Claude Sonnet, `test-writer` |
+| Review the diff | Claude Sonnet, `reviewer` | same, plus Go: GLM-5.2 |
+| Write tests | Go: Claude Haiku 5.5, then Kimi K3.1 Pro at its cap | Claude Sonnet, `test-writer` |
 | Run tests, scans, eval | No model: `task brief` | same |
-| Attack the change | Go: Gemini 4 Argon | Claude Opus, `pentester` |
+| Attack the change | Go: Claude Haiku 5.5 | Claude Opus, `pentester` |
 
 Go models run through `task ai`, in a clean clone. When Go is down or a job's models are all at their limits, fall back to `explorer` and `chore` (Claude Haiku) and `test-writer` (Claude Sonnet).
 
-Claude only runs inside Claude Code. Never send a Claude subscription login through another tool, including jcode or OpenCode: Anthropic's terms forbid it.
+Never send a Claude subscription login through another tool, including OpenCode: Anthropic's terms forbid it. Claude Haiku 5.5 through OpenCode Go is fine: it's Go's own metered access, not that login. Go keeps its requests for 30 days, so it only ever gets the public clean clone.
 
 ## Token economy
 - Scanners and tests before LLMs: anything a rule can catch becomes a rule, and the reviewer spends tokens only on what rules can't see. A passing test run costs no model tokens.

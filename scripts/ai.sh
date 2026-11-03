@@ -41,6 +41,7 @@ surface=""
 cleanup() {
   if [ -n "$surface" ]; then
     # Keep a watched job readable for 10 minutes after it ends.
+    # shortcut: the kill could hit a reused PID if the server died early, upgrade if that ever happens.
     nohup bash -c 'sleep 600; cmux close-surface --surface "$1"; kill "$2"; rm -rf "$3"' _ "$surface" "$server" "$work" > /dev/null 2>&1 &
     return
   fi
@@ -99,6 +100,8 @@ watch_job() {
     sleep 1
     waited=$((waited + 1))
   done
+  # A patch must never be taken from a clone that a running or failed job may still be changing.
+  session_finished || { echo "The session didn't finish cleanly." >&2; status=1; return; }
   jq -c '.messages[] | select(.info.role == "assistant") | .parts[]
     | {text: "text", "step-finish": "step_finish", tool: "tool_use"}[.type] as $type
     | select($type) | {type: $type, part: .}' "$work/session.json" > "$events"
@@ -106,7 +109,7 @@ watch_job() {
 
 session_finished() {
   (cd "$work/repo" && OPENCODE_DISABLE_CLAUDE_CODE=1 opencode export "$session" > "$work/session.json" 2> /dev/null) || return 1
-  jq -e '.messages[-1].info.finish // "" | . != "" and . != "tool-calls"' "$work/session.json" > /dev/null 2>&1
+  jq -e '.messages[-1].info | .error == null and ((.finish // "") | . != "" and . != "tool-calls")' "$work/session.json" > /dev/null 2>&1
 }
 
 status=0
@@ -135,10 +138,11 @@ if [ "$agent" = writer ]; then
   rm -f "$work/repo/REVIEW.diff"
   clone_git() { git --git-dir="$work/git" --work-tree="$work/repo" -c core.quotePath=false "$@"; }
   clone_git add -A
-  changed="$(clone_git diff --cached --no-renames --name-only)"
+  # -z stops git quoting unusual names, which would slip past the anchored patterns below.
+  changed="$(clone_git diff --cached --no-renames --name-only -z | tr '\0' '\n')"
 
   # Permission rules only cover the edit tool, so check what actually changed before applying it.
-  if grep -qE '^(\.github|\.claude|\.opencode|scripts)/|^(Taskfile\.yml|opencode\.json|CLAUDE\.md)$|(^|/)\.env|\.mmdb$' <<< "$changed"; then
+  if grep -qiE '^(\.github|\.claude|\.opencode|scripts)/|^(Taskfile\.yml|opencode\.json|CLAUDE\.md)$|(^|/)\.env|\.mmdb$' <<< "$changed"; then
     echo "Refused: the job changed a protected path:" >&2
     printf '%s\n' "$changed" >&2
     exit 1

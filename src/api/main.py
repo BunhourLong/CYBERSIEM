@@ -311,9 +311,8 @@ def _clear_lockout(username: str) -> None:
 
 
 def _client_ip(request: Request) -> str | None:
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
+    # uvicorn's ProxyHeadersMiddleware (FORWARDED_ALLOW_IPS) resolves the trusted
+    # proxy chain into request.client; the raw X-Forwarded-For header is untrusted.
     return request.client.host if request.client else None
 
 
@@ -515,29 +514,9 @@ def _is_valid_ip(candidate: str | None) -> bool:
     return True
 
 
-def _extract_forwarded_ips(raw_value: str | None) -> list[str]:
-    if not raw_value or raw_value == "-":
-        return []
-
-    return [candidate.strip() for candidate in raw_value.split(",") if _is_valid_ip(candidate.strip())]
-
-
 def _resolve_ingest_ip(payload: IngestEventRequest) -> tuple[str, str]:
     if _is_valid_ip(payload.ip):
         return payload.ip, payload.ip_source or "payload_ip"
-
-    if _is_valid_ip(payload.cf_connecting_ip):
-        return payload.cf_connecting_ip, "cf_connecting_ip"
-
-    forwarded_ips = _extract_forwarded_ips(payload.x_forwarded_for)
-    if forwarded_ips:
-        return forwarded_ips[0], "x_forwarded_for"
-
-    if _is_valid_ip(payload.x_real_ip):
-        return payload.x_real_ip, "x_real_ip"
-
-    if _is_valid_ip(payload.peer_ip):
-        return payload.peer_ip, "peer_ip"
 
     raise HTTPException(status_code=422, detail="No valid client IP was provided for ingestion")
 

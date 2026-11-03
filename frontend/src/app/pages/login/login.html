@@ -1,0 +1,42 @@
+<main class="login">
+  <div class="login__column">
+    <div class="login__heading">
+      <h1 class="login__brand">Cappa</h1>
+      <p class="login__lead">Sign in to continue</p>
+    </div>
+
+    <div class="panel login__panel">
+      @if (error(); as message) {
+        <div class="notice login__error" role="alert">{{ message }}</div>
+      }
+
+      <form class="login__form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <div>
+          <label for="username" class="login__label">Username</label>
+          <input
+            id="username"
+            type="text"
+            class="login__input"
+            autocomplete="username"
+            required
+            formControlName="username"
+          />
+        </div>
+        <div>
+          <label for="password" class="login__label">Password</label>
+          <input
+            id="password"
+            type="password"
+            class="login__input"
+            autocomplete="current-password"
+            required
+            formControlName="password"
+          />
+        </div>
+        <button type="submit" class="btn btn--primary login__submit" [disabled]="submitting()">
+          {{ submitting() ? 'Signing in…' : 'Sign in' }}
+        </button>
+      </form>
+    </div>
+  </div>
+</main>

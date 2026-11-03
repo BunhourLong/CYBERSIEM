@@ -1,0 +1,64 @@
+.denied {
+  padding-block: 4rem;
+}
+
+.denied__card {
+  max-width: 28rem;
+  margin-inline: auto;
+  border: 1px solid rgba(127, 29, 29, 0.5);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 2rem;
+  text-align: center;
+}
+
+.denied__icon {
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 1rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(153, 27, 27, 0.5);
+  border-radius: 9999px;
+  background: rgba(69, 10, 10, 0.3);
+  color: var(--red-400);
+}
+
+.denied__icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.denied__title {
+  margin-bottom: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--zinc-100);
+}
+
+.denied__text {
+  font-size: 0.875rem;
+  color: var(--zinc-400);
+}
+
+.denied__required {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--zinc-500);
+}
+
+.denied__code {
+  font-family: var(--font-mono);
+  color: var(--zinc-300);
+}
+
+.denied__code--muted {
+  color: var(--zinc-400);
+}
+
+.denied__back {
+  margin-top: 1.5rem;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+}

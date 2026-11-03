@@ -1,0 +1,387 @@
+<app-header subtitle="Alert operations" />
+
+<main class="container alerts">
+  <section class="panel">
+    <div class="panel__header">
+      <h2 class="panel__title">Alerts</h2>
+      <div class="alerts__meta">
+        <p class="alerts__live">{{ view()?.blocked_ip_count ?? 0 }} blocked IPs — live, refreshes every 5s</p>
+        @if (session.isAdmin()) {
+          <button
+            type="button"
+            class="btn btn--sm btn--danger"
+            [class.btn--busy]="isBusy(clearAllKey)"
+            [disabled]="isBusy(clearAllKey)"
+            (click)="clearAllAlerts()"
+          >
+            Clear all alerts
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (actionError(); as message) {
+      <div class="notice alerts__error" role="alert">
+        <span>{{ message }}</span>
+        <button type="button" class="alerts__dismiss" aria-label="Dismiss" (click)="actionError.set(null)">×</button>
+      </div>
+    }
+
+    <!-- Filter bar -->
+    <form class="filters" [formGroup]="filterForm" (ngSubmit)="applyFilters()" role="search" aria-label="Filter alerts">
+      <div class="field">
+        <label class="field__label" for="filter-type">Type</label>
+        <select id="filter-type" class="control" formControlName="type">
+          <option value="">All types</option>
+          @for (type of alertTypes(); track type) {
+            <option [value]="type">{{ humanize(type) }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="filter-severity">Severity</label>
+        <select id="filter-severity" class="control" formControlName="severity">
+          <option value="">All severities</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="filter-status">Status</label>
+        <select id="filter-status" class="control" formControlName="status">
+          <option value="">All statuses</option>
+          <option value="unresolved">Unresolved</option>
+          <option value="malicious">Malicious</option>
+          <option value="safe">Safe</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="filter-ip">IP</label>
+        <input
+          id="filter-ip"
+          type="text"
+          class="control filters__ip"
+          placeholder="Filter by IP…"
+          autocomplete="off"
+          formControlName="ip"
+        />
+      </div>
+
+      <div class="field">
+        <span class="field__label">Blocked only</span>
+        <label class="filters__check">
+          <input type="checkbox" formControlName="blockedOnly" />
+          <span>Blocked</span>
+        </label>
+      </div>
+
+      @if (isFiltered()) {
+        <button type="button" class="btn filters__clear" (click)="clearFilters()">Clear filters</button>
+      }
+
+      <p class="filters__count" aria-live="polite">
+        {{ rows().length }} result(s)
+        @if (isFiltered()) {
+          <span class="filters__filtered">— filtered</span>
+        }
+      </p>
+    </form>
+
+    <div class="table-scroll">
+      <table class="data-table alerts-table">
+        <thead>
+          <tr>
+            <th scope="col">ID</th>
+            <th scope="col">Created (UTC)</th>
+            <th scope="col">IP</th>
+            <th scope="col">State</th>
+            <th scope="col">Score</th>
+            <th scope="col">Endpoint</th>
+            <th scope="col">Type</th>
+            <th scope="col">Severity</th>
+            <th scope="col">Conf.</th>
+            <th scope="col">Status</th>
+            <th scope="col">Message</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.alert.id) {
+            @let alert = row.alert;
+            @let open = expanded().has(alert.id);
+            @let ipBusy = isBusy('ip:' + alert.ip);
+
+            <tr class="alert-row" [class.alert-row--open]="open" (click)="toggle(alert.id)">
+              <td class="nowrap alert-row__id">
+                <button
+                  type="button"
+                  class="alert-row__toggle"
+                  [attr.aria-expanded]="open"
+                  [attr.aria-label]="(open ? 'Hide' : 'Show') + ' details for alert ' + alert.id"
+                  (click)="$event.stopPropagation(); toggle(alert.id)"
+                >
+                  {{ open ? '-' : '+' }}
+                </button>
+                {{ alert.id }}
+              </td>
+              <td class="nowrap tone-muted">{{ alert.created_at | date: 'yyyy-MM-dd HH:mm:ss' : 'UTC' }}</td>
+              <td class="nowrap mono tone-soft">{{ alert.ip }}</td>
+              <td [class]="'tone-' + row.stateTone">{{ row.stateLabel }}</td>
+              <td class="nowrap tone-strong">{{ formatScore(alert.current_score) }}</td>
+              <td class="mono tone-soft">{{ alert.endpoint }}</td>
+              <td class="tone-soft">{{ alert.type }}</td>
+              <td [class]="'tone-' + row.severityTone">{{ alert.severity }}</td>
+              <td class="nowrap alert-row__confidence" [class]="'tone-' + row.confidenceTone">{{ alert.confidence }}%</td>
+              <td [class]="'tone-' + row.statusTone">{{ alert.status }}</td>
+              <td class="tone-soft alert-row__message">{{ alert.message }}</td>
+              <td class="alert-row__actions" (click)="$event.stopPropagation()">
+                <div class="status-actions" role="group" aria-label="Alert status">
+                  @for (action of statusActions; track action.status) {
+                    @let current = alert.status === action.status;
+                    <button
+                      type="button"
+                      class="btn btn--sm status-btn"
+                      [class]="current ? 'status-btn--' + action.status : ''"
+                      [class.btn--busy]="isBusy('alert:' + alert.id)"
+                      [attr.aria-pressed]="current"
+                      [disabled]="current || isBusy('alert:' + alert.id)"
+                      (click)="setStatus(alert, action.status)"
+                    >
+                      {{ action.label }}
+                    </button>
+                  }
+                </div>
+
+                <div class="ip-actions">
+                  @if (row.blocked) {
+                    @if (alert.alert_hold_active) {
+                      <button
+                        type="button"
+                        class="btn btn--sm hold-btn"
+                        disabled
+                        title="Alert hold active — mark all alerts safe before releasing"
+                      >
+                        Hold active ({{ row.pendingReview }} pending)
+                      </button>
+                      @if (session.isAdmin()) {
+                        <button
+                          type="button"
+                          class="btn btn--sm btn--warning"
+                          [class.btn--busy]="ipBusy"
+                          [disabled]="ipBusy"
+                          (click)="controlIp(alert, 'force_unblock')"
+                        >
+                          Force release (admin)
+                        </button>
+                      }
+                    } @else {
+                      <button
+                        type="button"
+                        class="btn btn--sm"
+                        [class.btn--busy]="ipBusy"
+                        [disabled]="ipBusy"
+                        (click)="releaseIp(alert)"
+                      >
+                        Release block
+                      </button>
+                    }
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn btn--sm"
+                      [class.btn--busy]="ipBusy"
+                      [disabled]="ipBusy"
+                      (click)="blockIp(alert)"
+                    >
+                      Manual block IP
+                    </button>
+                  }
+
+                  @if (session.isAdmin()) {
+                    @if (row.trusted) {
+                      <button
+                        type="button"
+                        class="btn btn--sm"
+                        [class.btn--busy]="ipBusy"
+                        [disabled]="ipBusy"
+                        (click)="controlIp(alert, 'clear_trust')"
+                      >
+                        Remove trust
+                      </button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="btn btn--sm"
+                        [class.btn--busy]="ipBusy"
+                        [disabled]="ipBusy"
+                        (click)="controlIp(alert, 'trust')"
+                      >
+                        Trust IP
+                      </button>
+                    }
+                    @if (row.suppressed) {
+                      <button
+                        type="button"
+                        class="btn btn--sm"
+                        [class.btn--busy]="ipBusy"
+                        [disabled]="ipBusy"
+                        (click)="controlIp(alert, 'clear_override')"
+                      >
+                        End suppression
+                      </button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="btn btn--sm"
+                        [class.btn--busy]="ipBusy"
+                        [disabled]="ipBusy"
+                        (click)="controlIp(alert, 'suppress_auto_block')"
+                      >
+                        Suppress 1h
+                      </button>
+                    }
+                  }
+                </div>
+              </td>
+            </tr>
+
+            @if (open) {
+              <tr class="alert-details">
+                <td colspan="12">
+                  <div class="details-grid">
+                    <div>
+                      <p class="details__label">Source IP</p>
+                      <p class="details__value mono">{{ alert.ip }}</p>
+                    </div>
+                    <div>
+                      <p class="details__label">Approximate location</p>
+                      @if (row.location) {
+                        <p class="details__value">{{ row.location }}</p>
+                      } @else if (row.nonPublicScope) {
+                        <p class="details__value details__value--muted">Unavailable for {{ row.nonPublicScope }} IPs</p>
+                      } @else {
+                        <p class="details__value details__value--muted">Unavailable</p>
+                      }
+                    </div>
+                    <div>
+                      <p class="details__label">Endpoint</p>
+                      <p class="details__value mono">{{ alert.endpoint }}</p>
+                    </div>
+                    <div>
+                      <p class="details__label">Attack type</p>
+                      <p class="details__value">{{ alert.type }}</p>
+                    </div>
+                    <div>
+                      <p class="details__label">Confidence</p>
+                      <p class="details__value" [class]="'tone-' + row.confidenceDetailTone">
+                        {{ alert.confidence }}% — {{ row.confidence }}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="details__label">IP enforcement</p>
+                      <p class="details__value">{{ row.enforcement }}</p>
+                    </div>
+                    <div>
+                      <p class="details__label">Alert hold</p>
+                      @if (alert.alert_hold_active) {
+                        <p class="details__value details__value--alarm">
+                          Active — {{ row.pendingReview }} alert(s) pending review ({{ alert.unresolved_alert_count }}
+                          unresolved, {{ alert.malicious_alert_count }} malicious, {{ alert.safe_alert_count }} safe)
+                        </p>
+                      } @else if (alert.safe_alert_count > 0) {
+                        <p class="details__value tone-emerald">Cleared — all {{ alert.safe_alert_count }} alert(s) safe</p>
+                      } @else {
+                        <p class="details__value tone-emerald">Inactive</p>
+                      }
+                    </div>
+                    <div>
+                      <p class="details__label">Current score</p>
+                      <p class="details__value">{{ formatScore(alert.current_score) }}</p>
+                    </div>
+                    <div>
+                      <p class="details__label">GeoIP accuracy</p>
+                      @if (alert.accuracy_radius_km) {
+                        <p class="details__value">{{ alert.accuracy_radius_km }} km radius</p>
+                      } @else if (row.nonPublicScope) {
+                        <p class="details__value details__value--muted">Skipped for {{ row.nonPublicScope }} IP</p>
+                      } @else {
+                        <p class="details__value details__value--muted">Unknown</p>
+                      }
+                    </div>
+                    <div>
+                      <p class="details__label">Enforcement windows</p>
+                      <p class="details__value">{{ row.enforcementWindow }}</p>
+                    </div>
+                    <div>
+                      <p class="details__label">Analyst controls</p>
+                      <p class="details__value">{{ row.analystControls }}</p>
+                    </div>
+                    <div>
+                      <p class="details__label">Block count / streak</p>
+                      <p class="details__value">{{ alert.block_count }} blocks, {{ alert.offense_streak }} streak</p>
+                    </div>
+                  </div>
+
+                  <div class="details__section">
+                    <p class="details__label">Description</p>
+                    <p class="details__value">{{ row.description }}</p>
+                  </div>
+
+                  @if (row.evidence) {
+                    <div class="details__section">
+                      <p class="details__label">Observed payload / evidence</p>
+                      <pre class="details__evidence">{{ row.evidence }}</pre>
+                    </div>
+                  }
+
+                  @if (row.metadata.length) {
+                    <div class="details__section">
+                      <p class="details__label">Detection metadata</p>
+                      <dl class="metadata-grid">
+                        @for (entry of row.metadata; track entry.key) {
+                          <div class="metadata-grid__item">
+                            <dt>{{ entry.key }}</dt>
+                            <dd [title]="entry.value">{{ entry.value }}</dd>
+                          </div>
+                        }
+                      </dl>
+                    </div>
+                  }
+
+                  <div class="details__section">
+                    <p class="details__label">Reputation reasons</p>
+                    @if (alert.reputation_reasons.length) {
+                      <p class="details__value">{{ alert.reputation_reasons.join(', ') }}</p>
+                    } @else {
+                      <p class="details__value details__value--muted">No active reputation reasons.</p>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          } @empty {
+            <tr>
+              <td colspan="12" class="empty-cell alerts__empty">
+                @if (view()) {
+                  No alerts found.
+                } @else if (loadFailed()) {
+                  Alerts are unavailable. Retrying every 5 seconds…
+                } @else {
+                  Loading alerts…
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (loadFailed() && view()) {
+      <p class="alerts__stale" role="status">Refresh failed — showing last loaded alerts.</p>
+    }
+  </section>
+</main>

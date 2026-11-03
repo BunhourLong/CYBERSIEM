@@ -72,7 +72,7 @@ An analyst dashboard provides live visibility into alerts, geographic threat map
 2. `LogMonitorService` reads the new log line → parses it into an `HTTPLogEvent`
 3. `SecurityEngine` runs all 8 detectors against the event
 4. Alerts are persisted; `EnforcementService` re-scores the IP reputation and rewrites `blocklist.conf` if the score crosses the block threshold
-5. The Cappa dashboard reflects all changes in real time via HTMX polling
+5. The Cappa dashboard (Angular) reflects all changes in near real time by polling the JSON API
 
 ---
 
@@ -262,13 +262,30 @@ From the dashboard, analysts can:
 | Layer | Technology |
 |---|---|
 | API / UI backend | Python 3.12, FastAPI, Uvicorn |
-| Templating | Jinja2, HTMX (partial page updates) |
 | Database | PostgreSQL 16, psycopg3 |
 | Reverse proxy | NGINX 1.27 (Alpine) |
 | GeoIP | MaxMind GeoLite2 (City + ASN) |
 | Data validation | Pydantic v2 |
 | Containerisation | Docker, Docker Compose v2 |
-| Frontend | Vanilla JS, Tailwind CSS (CDN) |
+| Frontend | Angular 22 (standalone components, signals), Leaflet — built into the `api` image |
+
+---
+
+## Frontend Development
+
+The UI lives in `frontend/` (Angular 22). Every screen is a standalone component with its own `.html` template, `.ts` logic and `.css` styles; shared colours and primitives are in `frontend/src/styles.css`. The Docker build compiles it automatically, so nothing extra is needed for `docker compose up`.
+
+For live-reload work, run the API on port 8000 (for example with the compose stack) and start the dev server, which proxies `/api` to it:
+
+```bash
+cd frontend
+npm ci
+npm start          # http://localhost:4200
+npm test           # unit tests (Vitest)
+npm run build      # production bundle → frontend/dist/cappa/browser
+```
+
+The UI talks to FastAPI only through JSON endpoints under `/api/`: `/api/auth/*` (login, logout, current user), `/api/ui/dashboard`, `/api/ui/map-points`, `/api/ui/alerts`, and the enforcement actions (`/api/alerts/{id}/status`, `/api/blocked-ips`, `/api/ip-controls`).
 
 ---
 
@@ -297,12 +314,15 @@ cybersiem/
 │       ├── enforcement_service.py # EnforcementService — manual analyst controls
 │       ├── repository.py        # PostgreSQL data access layer
 │       └── detectors/           # 8 threat detector classes
-├── views/                       # Jinja2 HTML templates
-│   ├── dashboard.html
-│   ├── alerts_page.html
-│   ├── alerts_table.html        # HTMX-driven alert table
-│   ├── login.html
-│   └── denied.html
+├── frontend/                    # Angular UI (served by the FastAPI container)
+│   └── src/app/
+│       ├── core/                # API client, session, guards, shared helpers
+│       ├── shared/app-header/   # Top bar (html / ts / css)
+│       └── pages/               # One folder per screen, each with .html / .ts / .css
+│           ├── login/
+│           ├── dashboard/       # + attack-map/ (Leaflet)
+│           ├── alerts/
+│           └── denied/
 ├── stack/                       # Docker Compose deployment config
 │   ├── docker-compose.yml
 │   ├── nginx/nginx.conf.template  # NGINX config — NGINX_HOST substituted at startup
@@ -356,7 +376,7 @@ Cappa demonstrates end-to-end security engineering across several domains:
 - **Systems programming** — real-time log processing pipeline with zero-copy parsing, sliding-window state across millions of events, and a score-decay model that prevents unbounded memory growth
 - **Distributed enforcement** — reputation decisions made in one process propagate to an NGINX gateway in under 2 seconds without a server restart, using a shared volume and a SHA-256 checksum hot-reload loop
 - **Secure web application** — HMAC-signed session cookies, PBKDF2 password hashing (260,000 iterations), role-based access control, and security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy)
-- **Full-stack delivery** — FastAPI backend, Jinja2 + HTMX frontend, PostgreSQL schema design with JSONB metadata, and complete Docker Compose orchestration deployable to EC2 in a single command
+- **Full-stack delivery** — FastAPI backend, Angular frontend, PostgreSQL schema design with JSONB metadata, and complete Docker Compose orchestration deployable to EC2 in a single command
 
 ---
 

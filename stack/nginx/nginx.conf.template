@@ -61,17 +61,12 @@ http {
             # the browser follows /siem/<path> instead of bare /<path>.
             proxy_redirect ~^/(.*)$ /siem/$1;
 
-            # Rewrite absolute paths in HTML responses so internal links work
-            # when the app is mounted at /siem/ instead of /.
+            # The Angular shell ships with <base href="/">. Rewriting it to
+            # /siem/ makes its assets, routes and relative API calls resolve
+            # under this mount point.
             sub_filter_types text/html;
             sub_filter_once  off;
-            sub_filter 'href="/'       'href="/siem/';
-            sub_filter 'action="/'    'action="/siem/';
-            sub_filter 'hx-get="/'    'hx-get="/siem/';
-            sub_filter 'hx-post="/'   'hx-post="/siem/';
-            sub_filter 'hx-delete="/' 'hx-delete="/siem/';
-            sub_filter 'hx-patch="/'  'hx-patch="/siem/';
-            sub_filter 'hx-put="/'    'hx-put="/siem/';
+            sub_filter 'href="/' 'href="/siem/';
         }
 
         # ── /admin → Express admin panel ────────────────────────────────────

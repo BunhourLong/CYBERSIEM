@@ -1,0 +1,260 @@
+<app-header subtitle="Overview" />
+
+<main class="container dashboard">
+  @if (view(); as v) {
+    <!-- Analytics: top categories, severity, top IPs, alerts over time -->
+    <section class="panel">
+      <div class="panel__header">
+        <h2 class="panel__title">Analytics <span class="dashboard__window">— last 24 h</span></h2>
+        @if (loadFailed()) {
+          <span class="dashboard__stale" role="status">Refresh failed — showing last loaded data</span>
+        }
+      </div>
+
+      <div class="dashboard__grid dashboard__grid--four dashboard__pad">
+        <div class="card">
+          <h3 class="card__title">Top attack categories</h3>
+          <ul class="bars">
+            @for (row of topCategories(); track row.type) {
+              <li>
+                <div class="bars__label">
+                  <span class="bars__name" [title]="row.type">{{ row.label }}</span>
+                  <span class="tone-muted">{{ row.count }}</span>
+                </div>
+                <div class="bar"><div class="bar__fill bar__fill--amber" [style.width.%]="row.percent"></div></div>
+              </li>
+            } @empty {
+              <li class="dashboard__empty">No alerts in last 24h.</li>
+            }
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3 class="card__title">Severity distribution</h3>
+          <ul class="bars bars--roomy">
+            @for (row of severities(); track row.severity) {
+              <li>
+                <div class="bars__label">
+                  <span [class]="'tone-' + row.tone">{{ row.severity }}</span>
+                  <span class="tone-muted">{{ row.count }} <span class="dashboard__faint">({{ row.percent }}%)</span></span>
+                </div>
+                <div class="bar">
+                  <div class="bar__fill" [class]="'bar__fill--' + row.bar" [style.width.%]="row.percent"></div>
+                </div>
+              </li>
+            } @empty {
+              <li class="dashboard__empty">No alerts in last 24h.</li>
+            }
+          </ul>
+          @if (severityTotal() > 0) {
+            <p class="dashboard__footnote">{{ severityTotal() }} total alerts</p>
+          }
+        </div>
+
+        <div class="card">
+          <h3 class="card__title">Top IPs by alerts</h3>
+          <ul class="bars bars--compact">
+            @for (row of topIps(); track row.ip) {
+              <li>
+                <div class="bars__label">
+                  <span class="mono bars__name bars__name--ip" [title]="row.ip">{{ row.ip }}</span>
+                  <span class="bars__meta">
+                    <span [class]="'tone-' + row.tone">{{ row.current_state }}</span>
+                    <span class="dashboard__dim">{{ row.alert_count }}</span>
+                  </span>
+                </div>
+                <div class="bar bar--thin">
+                  <div class="bar__fill" [class]="'bar__fill--' + row.bar" [style.width.%]="row.percent"></div>
+                </div>
+              </li>
+            } @empty {
+              <li class="dashboard__empty">No data.</li>
+            }
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3 class="card__title">Alerts over time</h3>
+          @if (hourly().bars.length) {
+            <div class="histogram">
+              @for (row of hourly().bars; track row.hour) {
+                <div
+                  class="histogram__bar"
+                  [style.height.%]="row.height"
+                  [title]="(row.hour | date: 'HH:mm' : 'UTC') + ' — ' + row.count + ' alert(s)'"
+                ></div>
+              }
+            </div>
+            <div class="histogram__axis">
+              <span>{{ hourly().first | date: 'HH:mm' : 'UTC' }}</span>
+              <span>{{ hourly().last | date: 'HH:mm' : 'UTC' }}</span>
+            </div>
+            <p class="dashboard__footnote">
+              {{ hourly().total }} alerts across {{ hourly().bars.length }} hour(s) · UTC
+            </p>
+          } @else {
+            <p class="dashboard__empty dashboard__empty--spaced">No alerts in last 24h.</p>
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- Overview: attack map, counts, offenders, transitions, block timers -->
+    <section class="panel">
+      <div class="panel__header">
+        <h2 class="panel__title">Overview</h2>
+      </div>
+
+      <div class="dashboard__pad">
+        <div class="card card--flush">
+          <div class="dashboard__map-header">
+            <div>
+              <h3 class="card__title">Attack map</h3>
+              <p class="card__subtitle">Recent alerts mapped to approximate public IP locations</p>
+            </div>
+            <a routerLink="/alerts" class="btn">Open alerts</a>
+          </div>
+          <app-attack-map [points]="mapPoints()" [failed]="mapFailed()" />
+        </div>
+      </div>
+
+      <div class="dashboard__grid dashboard__grid--four dashboard__pad dashboard__pad--tight">
+        <div class="card">
+          <h3 class="card__title">Recent alert snapshot</h3>
+          <dl class="stats">
+            @for (row of snapshot(); track row.label) {
+              <div class="stats__row">
+                <dt>{{ row.label }}</dt>
+                <dd [class]="'tone-' + row.tone">{{ row.value }}</dd>
+              </div>
+            }
+          </dl>
+          <a routerLink="/alerts" class="btn dashboard__cta">Open alerts page</a>
+        </div>
+
+        <div class="card">
+          <h3 class="card__title">Reputation states</h3>
+          <dl class="stats">
+            @for (row of reputationStates(); track row.key) {
+              <div class="stats__row">
+                <dt>{{ row.label }}</dt>
+                <dd [class]="'tone-' + row.tone">{{ row.value }}</dd>
+              </div>
+            }
+          </dl>
+        </div>
+
+        <div class="card dashboard__wide">
+          <div class="card__heading">
+            <div>
+              <h3 class="card__title">Top offenders</h3>
+              <p class="card__subtitle">Highest current scores and enforcement context</p>
+            </div>
+            <span class="dashboard__count">{{ v.top_offenders.length }} IPs</span>
+          </div>
+          <div class="table-scroll card__table">
+            <table class="data-table compact-table">
+              <thead>
+                <tr>
+                  <th scope="col">IP</th>
+                  <th scope="col">State</th>
+                  <th scope="col">Score</th>
+                  <th scope="col">Block window</th>
+                  <th scope="col">Reasons</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (offender of v.top_offenders; track offender.ip) {
+                  <tr>
+                    <td class="mono tone-strong">{{ offender.ip }}</td>
+                    <td [class]="'tone-' + offenderTone(offender)">{{ offender.current_state }}</td>
+                    <td class="tone-bright">{{ formatScore(offender.current_score) }}</td>
+                    <td class="tone-soft nowrap">{{ offenderWindow(offender) }}</td>
+                    <td class="tone-muted">
+                      {{ offender.reputation_reasons.length ? offender.reputation_reasons.join(', ') : 'No active reasons' }}
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="5" class="empty-cell">No IP reputation data yet.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard__grid dashboard__grid--split dashboard__pad dashboard__pad--tight">
+        <div class="card">
+          <div class="card__heading">
+            <div>
+              <h3 class="card__title">Recent reputation transitions</h3>
+              <p class="card__subtitle">Automatic and analyst-driven state changes</p>
+            </div>
+            <span class="dashboard__count">{{ v.recent_transitions.length }} entries</span>
+          </div>
+          <div class="table-scroll card__table">
+            <table class="data-table compact-table">
+              <thead>
+                <tr>
+                  <th scope="col">Time (UTC)</th>
+                  <th scope="col">IP</th>
+                  <th scope="col">Transition</th>
+                  <th scope="col">Score</th>
+                  <th scope="col">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (transition of v.recent_transitions; track transition.id) {
+                  <tr>
+                    <td class="tone-muted nowrap">{{ transition.created_at | date: 'yyyy-MM-dd HH:mm:ss' : 'UTC' }}</td>
+                    <td class="mono tone-strong">{{ transition.ip }}</td>
+                    <td class="tone-soft">
+                      {{ transition.old_state }} -> {{ transition.new_state }}
+                      <div class="dashboard__source">{{ transition.manual_or_auto }}</div>
+                    </td>
+                    <td class="tone-soft nowrap">
+                      {{ formatScore(transition.score_before) }} -> {{ formatScore(transition.score_after) }}
+                    </td>
+                    <td class="tone-muted">{{ humanize(transition.trigger_reason) }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="5" class="empty-cell">No reputation transitions recorded yet.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card__title">Current block countdowns</h3>
+          <div class="countdowns">
+            @for (blocked of v.blocked_ips; track blocked.ip) {
+              <div class="countdown">
+                <div class="countdown__row">
+                  <span class="mono tone-strong">{{ blocked.ip }}</span>
+                  <span class="countdown__kind" [class.tone-red]="blocked.manual_blocked">
+                    {{ blocked.manual_blocked ? 'manual' : 'auto' }}
+                  </span>
+                </div>
+                <div class="countdown__row countdown__row--detail">
+                  <span class="tone-muted">{{ blocked.blocked_reason || 'blocked' }}</span>
+                  <span class="tone-red">{{ blockCountdown(blocked) }}</span>
+                </div>
+              </div>
+            } @empty {
+              <p class="dashboard__empty">No IPs are currently blocked.</p>
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+  } @else if (loadFailed()) {
+    <div class="notice" role="alert">Dashboard data is unavailable. Retrying every 15 seconds…</div>
+  } @else {
+    <p class="dashboard__loading" role="status">Loading dashboard…</p>
+  }
+</main>

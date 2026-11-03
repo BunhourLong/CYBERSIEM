@@ -42,6 +42,10 @@ class AlertResponse(BaseModel):
     manual_blocked: bool = False
     blocked_reason: str | None = None
     threshold_reached: bool = False
+    total_alert_count: int = 0
+    safe_alert_count: int = 0
+    unresolved_alert_count: int = 0
+    malicious_alert_count: int = 0
     alert_hold_active: bool = False
     reputation_reasons: list[str] = Field(default_factory=list)
     block_countdown_seconds: int | None = None
@@ -179,3 +183,55 @@ class DashboardStats(BaseModel):
     top_ips: list[TopIPEntry] = Field(default_factory=list)
     alerts_per_hour: list[AlertsPerHour] = Field(default_factory=list)
     hours_window: int = 24
+
+
+# ---------------------------------------------------------------------------
+# Angular UI (frontend/) contracts
+# ---------------------------------------------------------------------------
+
+class LoginRequest(BaseModel):
+    username: str = ""
+    password: str = ""
+
+
+class CurrentUserResponse(BaseModel):
+    username: str
+    role: str
+
+
+class ReputationTransitionResponse(BaseModel):
+    id: int
+    ip: str
+    old_state: str
+    new_state: str
+    score_before: float = 0
+    score_after: float = 0
+    trigger_reason: str
+    manual_or_auto: str
+    created_at: datetime
+
+
+class AlertStatusSummary(BaseModel):
+    loaded: int = 0
+    unresolved: int = 0
+    safe: int = 0
+    malicious: int = 0
+
+
+class DashboardViewResponse(BaseModel):
+    analytics: DashboardStats
+    alert_summary: AlertStatusSummary
+    state_counts: dict[str, int] = Field(default_factory=dict)
+    blocked_ips: list[BlockedIPResponse] = Field(default_factory=list)
+    top_offenders: list[BlockedIPResponse] = Field(default_factory=list)
+    recent_transitions: list[ReputationTransitionResponse] = Field(default_factory=list)
+
+
+class AlertsViewResponse(BaseModel):
+    alerts: list[AlertResponse] = Field(default_factory=list)
+    alert_types: list[str] = Field(default_factory=list)
+    blocked_ip_count: int = 0
+
+
+class DeleteAlertsResponse(BaseModel):
+    deleted: int

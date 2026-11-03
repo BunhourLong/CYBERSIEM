@@ -35,7 +35,7 @@ if [ -n "$(git -C "$repo" status --porcelain)" ]; then
 fi
 
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+trap 'rm -rf "$work" ${config:+"$config"}' EXIT
 git clone -q --depth 1 --no-tags "file://$repo" "$work/repo"
 
 # Prefer origin/main: a stale local main would widen the diff under review.
@@ -46,10 +46,51 @@ git -C "$repo" diff "$base...HEAD" > "$work/repo/REVIEW.diff"
 # Keep .git out of the job's reach: a written .git/config could run code when git reads it later.
 mv "$work/repo/.git" "$work/git"
 
+# AI_WATCH=1 runs the job in a new Warp tab so you can follow it, and waits for it here.
+watch_job() {
+  local name="ai-$role-$$" waited=0
+  config="$HOME/.warp/tab_configs/$name.toml"
+  cp "$prompt_file" "$work/prompt"
+  {
+    printf 'work=%q events=%q errors=%q model=%q agent=%q\n' "$work" "$events" "$errors" "$model" "$agent"
+    cat <<'EOF'
+status=1
+trap 'echo "$status" > "$work/done"' EXIT
+touch "$work/started"
+OPENCODE_DISABLE_CLAUDE_CODE=1 opencode run --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$work/prompt")" \
+  2> "$errors" < /dev/null | tee "$events" | jq --unbuffered -r '
+    if .type == "text" then .part.text
+    elif .type == "tool_use" then "-> \(.part.tool) \(.part.state.input | tostring | .[0:120])"
+    elif .type == "error" then "ERROR: \(.error.data.message // .error.name)"
+    else empty end'
+status=${PIPESTATUS[0]}
+echo; echo "Job finished. You can close this tab."
+EOF
+  } > "$work/run.sh"
+  mkdir -p "$(dirname "$config")"
+  printf 'name = "%s"\n\n[[panes]]\nid = "job"\ntype = "terminal"\ndirectory = "%s"\ncommands = ["bash %s/run.sh"]\n' \
+    "$name" "$repo" "$work" > "$config"
+  open "warp://tab_config/$name"
+  until [ -s "$work/done" ]; do
+    sleep 1
+    waited=$((waited + 1))
+    if [ "$waited" -ge 1800 ] || { [ "$waited" -ge 60 ] && [ ! -e "$work/started" ]; }; then
+      echo "The Warp tab didn't start or finish the job." >&2
+      status=1
+      return
+    fi
+  done
+  status="$(cat "$work/done")"
+}
+
 status=0
 # Claude config on this machine is private and adds tokens, so OpenCode shouldn't load it.
-OPENCODE_DISABLE_CLAUDE_CODE=1 opencode run --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
-  > "$events" 2> "$errors" < /dev/null || status=$?
+if [ -n "${AI_WATCH:-}" ]; then
+  watch_job
+else
+  OPENCODE_DISABLE_CLAUDE_CODE=1 opencode run --dir "$work/repo" -m "$model" --agent "$agent" --format json "$(cat "$prompt_file")" \
+    > "$events" 2> "$errors" < /dev/null || status=$?
+fi
 
 api_error="$(jq -r 'select(.type=="error") | .error.data.message // .error.name' "$events" 2>/dev/null || echo "unreadable output")"
 if [ "$status" -ne 0 ] || [ -n "$api_error" ]; then

@@ -378,8 +378,9 @@ def evaluate_ip_reputation(
 
     # Hold is active when any non-safe alert meets the actionable threshold.
     # It clears only when every alert for this IP has been marked safe.
-    new_alert_hold = (unresolved_alert_count > 0 or malicious_alert_count > 0) and any(
-        config.weight_for_alert(a.alert_type, a.severity) >= ALERT_HOLD_MIN_WEIGHT or a.severity == "high"
+    new_alert_hold = any(
+        a.status in {"unresolved", "malicious"}
+        and (config.weight_for_alert(a.alert_type, a.severity) >= ALERT_HOLD_MIN_WEIGHT or a.severity == "high")
         for a in alert_evidence
     )
 

@@ -76,6 +76,46 @@ def test_manual_block_override_blocks_with_manual_reason():
     assert evaluation.reputation_reasons == ["manual_block_override"]
 
 
+def test_safe_high_alert_does_not_hold_with_unrelated_low_unresolved_alert(make_alert_row):
+    rows = [
+        make_alert_row(id=1, type="payload_sqli", severity="high", status="safe"),
+        make_alert_row(id=2, type="user_agent_rotation", severity="low", status="unresolved"),
+    ]
+
+    evaluation = evaluate_ip_reputation(IP, rows, now=NOW)
+
+    assert evaluation.current_state == "trusted"
+    assert evaluation.blocked_reason is None
+    assert evaluation.alert_hold_active is False
+
+
+@pytest.mark.parametrize("status", ["unresolved", "malicious"])
+def test_high_active_alert_holds_alongside_safe_alert(make_alert_row, status):
+    rows = [
+        make_alert_row(id=1, type="payload_sqli", severity="high", status="safe"),
+        make_alert_row(id=2, type="payload_sqli", severity="high", status=status),
+    ]
+
+    evaluation = evaluate_ip_reputation(IP, rows, now=NOW)
+
+    assert evaluation.current_state == "blocked"
+    assert evaluation.blocked_reason == "alert_hold"
+    assert evaluation.alert_hold_active is True
+
+
+def test_all_safe_alerts_release_alert_hold(make_alert_row):
+    rows = [
+        make_alert_row(id=1, type="payload_sqli", severity="high", status="safe"),
+        make_alert_row(id=2, type="payload_sqli", severity="high", status="safe"),
+    ]
+
+    evaluation = evaluate_ip_reputation(IP, rows, now=NOW)
+
+    assert evaluation.current_state == "trusted"
+    assert evaluation.blocked_reason is None
+    assert evaluation.alert_hold_active is False
+
+
 def test_alert_hold_blocks_and_clears_block_timer(make_alert_row):
     previous = IPReputationRecord(
         ip=IP,

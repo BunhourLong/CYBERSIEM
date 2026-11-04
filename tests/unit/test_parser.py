@@ -6,14 +6,11 @@ from src.security_engine.parser import LogParseError, parse_nginx_log_line
 
 
 def _line(request: str, status: int = 200) -> str:
-    return (
-        '172.17.0.1 - a b [04/Nov/2026:00:59:25 +0000] '
-        f'"{request}" {status} 15 "-" "-" "-" "-" "172.17.0.1"'
-    )
+    return f'172.17.0.1 - a b [04/Nov/2026:00:59:25 +0000] "{request}" {status} 15 "-" "-" "-" "-" "172.17.0.1"'
 
 
 @pytest.mark.parametrize(
-    ("request", "method", "endpoint", "request_target"),
+    ("req", "method", "endpoint", "request_target"),
     [
         ("GET /b HTTP/1.1", "GET", "/b", "/b"),
         ("GET /h09 HTTP/1.1", "GET", "/h09", "/h09"),
@@ -23,10 +20,15 @@ def _line(request: str, status: int = 200) -> str:
         ("GET /a b HTTP/1.1", "-", "/", "GET /a b HTTP/1.1"),
         ("\x16\x03\x01garbage", "-", "/", "\x16\x03\x01garbage"),
         ("GET /aaaa", "GET", "/aaaa", "/aaaa"),
+        ("GET /h09", "GET", "/h09", "/h09"),
+        ("GET //[x HTTP/1.1", "GET", "/[x", "//[x"),
+        ("GET //.env HTTP/1.1", "GET", "/.env", "//.env"),
+        ("GET http://evil/abs HTTP/1.1", "GET", "/abs", "http://evil/abs"),
+        ("GET http://evil HTTP/1.1", "GET", "/", "http://evil"),
     ],
 )
-def test_client_controlled_requests_parse(request, method, endpoint, request_target):
-    event = parse_nginx_log_line(_line(request))
+def test_client_controlled_requests_parse(req, method, endpoint, request_target):
+    event = parse_nginx_log_line(_line(req))
 
     assert event.method == method
     assert event.endpoint == endpoint
@@ -37,7 +39,7 @@ def test_client_controlled_requests_parse(request, method, endpoint, request_tar
 
 def test_normal_extended_line_is_unchanged():
     line = (
-        '203.0.113.7 - - [04/Nov/2026:00:59:25 +0000] '
+        "203.0.113.7 - - [04/Nov/2026:00:59:25 +0000] "
         '"GET /index.html HTTP/1.1" 404 0 "https://example.com" "curl/8" '
         '"203.0.113.7" "-" "10.0.0.2"'
     )
@@ -74,5 +76,24 @@ def test_query_parameters_are_extracted():
 
 @pytest.mark.parametrize("line", ["not a log line", "", '172.17.0.1 - - "GET /" 200'])
 def test_non_log_text_is_rejected(line):
+    with pytest.raises(LogParseError):
+        parse_nginx_log_line(line)
+
+
+def test_dash_dash_user_parses():
+    line = '1.2.3.4 - - - [04/Nov/2026:00:59:25 +0000] "GET /h09" 200 15 "-" "-"'
+    assert parse_nginx_log_line(line).endpoint == "/h09"
+
+
+def test_odd_user_never_raises_bare_value_error():
+    line = '1.2.3.4 - a [b [04/Nov/2026:00:59:25 +0000] "GET / HTTP/1.1" 200 15 "-" "-"'
+    try:
+        parse_nginx_log_line(line)
+    except LogParseError:
+        pass
+
+
+def test_bad_timestamp_raises_log_parse_error():
+    line = '1.2.3.4 - - [99/Nov/2026:00:59:25 +0000] "GET / HTTP/1.1" 200 15 "-" "-"'
     with pytest.raises(LogParseError):
         parse_nginx_log_line(line)

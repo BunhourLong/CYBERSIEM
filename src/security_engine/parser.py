@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from ipaddress import ip_address
-from urllib.parse import urlsplit
 
 from src.core.http_models import HTTPLogEvent
 
@@ -23,6 +22,9 @@ NGINX_EXTENDED_LOG_PATTERN = re.compile(
 )
 
 REQUEST_PATTERN = re.compile(r"^(?P<method>[A-Za-z_-]+) (?P<target>\S+)(?: HTTP/\S+)?$")
+
+TARGET_PATTERN = re.compile(r"(?:[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*)?(?P<path>[^?#]*)(?:\?(?P<query>[^#]*))?(?:#.*)?")
+SLASH_RUN = re.compile(r"/{2,}")
 
 
 class LogParseError(ValueError):
@@ -67,8 +69,9 @@ def _parse_request(request: str) -> tuple[str, str, str, str]:
         return "-", request, "/", ""
 
     target = match.group("target")
-    parsed_target = urlsplit(target)
-    return match.group("method"), target, parsed_target.path or "/", parsed_target.query
+    parts = TARGET_PATTERN.fullmatch(target)
+    path = SLASH_RUN.sub("/", parts.group("path")) or "/"  # NGINX merge_slashes
+    return match.group("method"), target, path, parts.group("query") or ""
 
 
 def parse_nginx_log_line(line: str) -> HTTPLogEvent:
@@ -85,8 +88,13 @@ def parse_nginx_log_line(line: str) -> HTTPLogEvent:
     method, target, endpoint, query = _parse_request(match.group("request"))
     client_ip = match.group("ip")
 
+    try:
+        timestamp = datetime.strptime(match.group("timestamp"), "%d/%b/%Y:%H:%M:%S %z")
+    except ValueError as exc:
+        raise LogParseError("Invalid timestamp in log line") from exc
+
     return HTTPLogEvent(
-        timestamp=datetime.strptime(match.group("timestamp"), "%d/%b/%Y:%H:%M:%S %z"),
+        timestamp=timestamp,
         ip=client_ip,
         method=method,
         endpoint=endpoint,

@@ -16,7 +16,7 @@ def _line(request: str, status: int = 200) -> str:
         ("GET /h09 HTTP/1.1", "GET", "/h09", "/h09"),
         ("FOO_BAR /m1 HTTP/1.1", "FOO_BAR", "/m1", "/m1"),
         ("FOO-BAR /m2 HTTP/1.1", "FOO-BAR", "/m2", "/m2"),
-        ("get /m3 HTTP/1.1", "get", "/m3", "/m3"),
+        ("get /m3 HTTP/1.1", "GET", "/m3", "/m3"),
         ("GET /a b HTTP/1.1", "-", "/", "GET /a b HTTP/1.1"),
         ("\x16\x03\x01garbage", "-", "/", "\x16\x03\x01garbage"),
         ("GET /aaaa", "GET", "/aaaa", "/aaaa"),

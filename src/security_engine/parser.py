@@ -8,19 +8,21 @@ from urllib.parse import urlsplit
 from src.core.http_models import HTTPLogEvent
 
 NGINX_COMBINED_LOG_PATTERN = re.compile(
-    r"^(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>[^\]]+)\] "
-    r'"(?P<method>[A-Z]+) (?P<target>\S+) HTTP/(?P<http_version>[^"]+)" '
+    r"^(?P<ip>\S+) \S+ \S+ [^\[]*\[(?P<timestamp>[^\]]+)\] "
+    r'"(?P<request>[^"]*)" '
     r"(?P<status>\d{3}) (?P<body_bytes_sent>\d+|-) "
     r'"(?P<referer>[^"]*)" "(?P<user_agent>[^"]*)"$'
 )
 
 NGINX_EXTENDED_LOG_PATTERN = re.compile(
-    r"^(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>[^\]]+)\] "
-    r'"(?P<method>[A-Z]+) (?P<target>\S+) HTTP/(?P<http_version>[^"]+)" '
+    r"^(?P<ip>\S+) \S+ \S+ [^\[]*\[(?P<timestamp>[^\]]+)\] "
+    r'"(?P<request>[^"]*)" '
     r"(?P<status>\d{3}) (?P<body_bytes_sent>\d+|-) "
     r'"(?P<referer>[^"]*)" "(?P<user_agent>[^"]*)" '
     r'"(?P<x_forwarded_for>[^"]*)" "(?P<x_real_ip>[^"]*)" "(?P<peer_ip>[^"]*)"$'
 )
+
+REQUEST_PATTERN = re.compile(r"^(?P<method>[A-Za-z_-]+) (?P<target>\S+)(?: HTTP/\S+)?$")
 
 
 class LogParseError(ValueError):
@@ -59,6 +61,16 @@ def _detect_ip_source(client_ip: str, x_forwarded_for: str, x_real_ip: str) -> s
     return "remote_addr"
 
 
+def _parse_request(request: str) -> tuple[str, str, str, str]:
+    match = REQUEST_PATTERN.match(request)
+    if not match:
+        return "-", request, "/", ""
+
+    target = match.group("target")
+    parsed_target = urlsplit(target)
+    return match.group("method"), target, parsed_target.path or "/", parsed_target.query
+
+
 def parse_nginx_log_line(line: str) -> HTTPLogEvent:
     raw_line = line.strip()
     match = NGINX_EXTENDED_LOG_PATTERN.match(raw_line)
@@ -70,21 +82,19 @@ def parse_nginx_log_line(line: str) -> HTTPLogEvent:
     x_forwarded_for = match.groupdict().get("x_forwarded_for", "-") or "-"
     x_real_ip = match.groupdict().get("x_real_ip", "-") or "-"
     peer_ip = match.groupdict().get("peer_ip", "-") or "-"
-    target = match.group("target")
-    parsed_target = urlsplit(target)
-    endpoint = parsed_target.path or "/"
+    method, target, endpoint, query = _parse_request(match.group("request"))
     client_ip = match.group("ip")
 
     return HTTPLogEvent(
         timestamp=datetime.strptime(match.group("timestamp"), "%d/%b/%Y:%H:%M:%S %z"),
         ip=client_ip,
-        method=match.group("method"),
+        method=method,
         endpoint=endpoint,
         status_code=int(match.group("status")),
         user_agent=match.group("user_agent"),
         request_target=target,
         raw_line=raw_line,
-        query=parsed_target.query,
+        query=query,
         referer=match.group("referer"),
         ip_source=_detect_ip_source(client_ip, x_forwarded_for, x_real_ip),
         peer_ip=peer_ip,

@@ -16,7 +16,7 @@ ${SET_REAL_IP_FROM}
     real_ip_recursive on;
 
     # Must match the format the security engine parser expects.
-    log_format cybersiem_combined '$remote_addr - $remote_user [$time_local] '
+    log_format cybersiem_combined '$remote_addr - - [$time_local] '
                                   '"$request" $status $body_bytes_sent '
                                   '"$http_referer" "$http_user_agent" '
                                   '"$http_x_forwarded_for" "$http_x_real_ip" "$realip_remote_addr"';

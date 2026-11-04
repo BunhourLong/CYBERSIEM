@@ -11,12 +11,12 @@ from src.security_engine.parser import LogParseError, parse_nginx_log_line
 
 class LogMonitorService:
     IDLE_LOG_INTERVAL_SECONDS = 10.0
-    MAX_LOG_LINE_PREVIEW_LENGTH = 200
 
     def __init__(self, engine: SecurityEngine | None = None) -> None:
         self.engine = engine or SecurityEngine()
         self.engine.enforcement_service.initialize()
         self._last_idle_log_at = 0.0
+        self.rejected_line_count = 0
 
     def process_line(self, line: str):
         event = parse_nginx_log_line(line)
@@ -43,10 +43,14 @@ class LogMonitorService:
                         line = stream.readline()
                         if line:
                             self._reset_idle_log_timer()
-                            self._log(f"Reading log line: {self._preview_line(line)}")
                             try:
                                 event, alerts = self.process_line(line)
                             except LogParseError:
+                                self.rejected_line_count += 1
+                                self._log(
+                                    "Rejected unparseable log line "
+                                    f"(total={self.rejected_line_count})"
+                                )
                                 continue
 
                             self._log(
@@ -88,13 +92,6 @@ class LogMonitorService:
     @staticmethod
     def _log(message: str) -> None:
         print(f"[security_engine] {message}", flush=True)
-
-    @classmethod
-    def _preview_line(cls, line: str) -> str:
-        preview = line.strip()
-        if len(preview) <= cls.MAX_LOG_LINE_PREVIEW_LENGTH:
-            return preview
-        return f"{preview[: cls.MAX_LOG_LINE_PREVIEW_LENGTH - 3]}..."
 
     def _log_idle(self, log_file: Path) -> None:
         now = time.monotonic()

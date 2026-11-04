@@ -260,14 +260,14 @@ def test_alert_hold_clears_on_previous_blocked_record_when_only_low_unresolved_r
     assert "alert_hold" not in evaluation.reputation_reasons
 
 
-def test_future_block_timer_keeps_ip_blocked_after_alert_hold_clears(make_alert_row):
+def test_future_block_timer_survives_marking_its_alert_safe(make_alert_row):
     block_until = NOW + timedelta(seconds=3600)
     previous = IPReputationRecord(
         ip=IP,
         current_state="blocked",
-        blocked_reason="alert_hold",
+        blocked_reason="sustained_score_threshold",
         blocked_until=block_until,
-        alert_hold_active=True,
+        alert_hold_active=False,
     )
     rows = [
         make_alert_row(id=1, type="payload_sqli", severity="high", status="safe"),
@@ -277,7 +277,7 @@ def test_future_block_timer_keeps_ip_blocked_after_alert_hold_clears(make_alert_
     evaluation = evaluate_ip_reputation(IP, rows, previous, now=NOW)
 
     assert evaluation.current_state == "blocked"
-    assert evaluation.blocked_reason == "block_window_active"
+    assert evaluation.blocked_reason == "sustained_score_threshold"
     assert evaluation.blocked_until == block_until
     assert evaluation.alert_hold_active is False
     assert evaluation.reputation_reasons == ["block_window_active"]

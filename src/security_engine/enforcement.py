@@ -376,8 +376,7 @@ def evaluate_ip_reputation(
     malicious_alert_count = sum(1 for alert in alert_evidence if alert.status == "malicious")
     alert_count = len(alert_evidence)
 
-    # Hold is active when any non-safe alert meets the actionable threshold.
-    # It clears only when every alert for this IP has been marked safe.
+    # Hold is active while any non-safe alert meets the actionable threshold, and clears once none does.
     new_alert_hold = any(
         a.status in {"unresolved", "malicious"}
         and (config.weight_for_alert(a.alert_type, a.severity) >= ALERT_HOLD_MIN_WEIGHT or a.severity == "high")
@@ -500,7 +499,7 @@ def evaluate_ip_reputation(
         alert_hold_active = new_alert_hold
         reasons.append("manual_block_override")
     elif new_alert_hold:
-        # Alert hold: IP stays blocked until every alert is reviewed and marked safe.
+        # Hold is active while any non-safe alert meets the actionable threshold, and clears once none does.
         current_state = "blocked"
         blocked_until = None  # no timer expiry — cleared only by alert review
         blocked_reason = "alert_hold"

@@ -2,7 +2,7 @@ services:
 
   # ── Shared nginx reverse proxy ──────────────────────────────────────────────
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.29-alpine
     container_name: stack_nginx
     restart: unless-stopped
     ports:

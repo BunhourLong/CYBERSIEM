@@ -135,6 +135,11 @@ def test_nginx_configs_do_not_hardcode_set_real_ip_from():
         assert "set_real_ip_from" not in path.read_text(encoding="utf-8")
 
 
+def test_nginx_template_forwards_only_peer_address():
+    template = (ROOT / "stack" / "nginx" / "nginx.conf.template").read_text(encoding="utf-8")
+    assert "$proxy_add_x_forwarded_for" not in template
+
+
 @pytest.mark.parametrize(
     "cidrs, code, out",
     [
@@ -145,10 +150,20 @@ def test_nginx_configs_do_not_hardcode_set_real_ip_from():
         ("::/0", 1, ""),
         ("0.0.0.0/00", 1, ""),
         ("::/000", 1, ""),
+        ("0.0.0.0/1", 1, ""),
+        ("128.0.0.0/1", 1, ""),
+        ("::/1", 1, ""),
+        ("8000::/16", 1, ""),
+        ("1.2.3.4/", 1, ""),
+        ("1.2.3.4/8/8", 1, ""),
         ("10.0.0.1,,10.0.0.2", 1, ""),
         ("10.0.0.0/8;", 1, ""),
         ("10.0.0.1\n10.0.0.2", 1, ""),
         ("10.0.0.1, 10.0.0.2", 1, ""),
+        ("10.0.0.0/8", 0, "set_real_ip_from 10.0.0.0/8;\n"),
+        ("10.0.0.0/08", 0, "set_real_ip_from 10.0.0.0/08;\n"),
+        ("2001:db8::/32", 0, "set_real_ip_from 2001:db8::/32;\n"),
+        ("1.2.3.4", 0, "set_real_ip_from 1.2.3.4;\n"),
         ("10.0.0.0/10", 0, "set_real_ip_from 10.0.0.0/10;\n"),
     ],
 )

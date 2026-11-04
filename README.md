@@ -154,7 +154,7 @@ Open `http://localhost/siem/login` and sign in with the credentials from `.env`.
 | `SIEM_ADMIN_USERNAME` | `admin` | Dashboard login username |
 | `SIEM_ADMIN_PASSWORD` | `Admin123456!!` | Dashboard login password (min 12 chars) |
 | `SIEM_SESSION_SECRET` | _(placeholder)_ | HMAC secret for cookies — run `openssl rand -base64 32` |
-| `TRUSTED_PROXY_CIDRS` | _(empty)_ | Comma-separated CIDRs of load balancers in front of NGINX; empty when NGINX is the edge, never a /0 |
+| `TRUSTED_PROXY_CIDRS` | _(empty)_ | Comma-separated CIDRs of load balancers in front of NGINX; empty when NGINX is the edge, no wider than /8 (IPv4) or /32 (IPv6) |
 | `DATABASE_URL` | _(local postgres)_ | PostgreSQL connection string |
 | `GEOIP_DB_PATH` | `/data/GeoLite2-City.mmdb` | Container path to GeoIP database |
 | `SESSION_SECURE` | `false` | Set `true` only after HTTPS is configured |

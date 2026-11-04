@@ -53,7 +53,7 @@ ${SET_REAL_IP_FROM}
 
             proxy_set_header Host              $host;
             proxy_set_header X-Real-IP         $remote_addr;
-            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-For   $remote_addr;
             proxy_set_header X-Forwarded-Proto $scheme;
 
             # Required so sub_filter can inspect the uncompressed response body.
@@ -84,7 +84,7 @@ ${SET_REAL_IP_FROM}
             # Set Host to admin.localhost so vhost() routes to the admin app.
             proxy_set_header Host              admin.localhost;
             proxy_set_header X-Real-IP         $remote_addr;
-            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-For   $remote_addr;
             proxy_set_header X-Forwarded-Proto $scheme;
 
             proxy_set_header Accept-Encoding   "";
@@ -103,7 +103,7 @@ ${SET_REAL_IP_FROM}
             proxy_pass http://express_app:3000;
             proxy_set_header Host              localhost;
             proxy_set_header X-Real-IP         $remote_addr;
-            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-For   $remote_addr;
             proxy_set_header X-Forwarded-Proto $scheme;
         }
 

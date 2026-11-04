@@ -152,7 +152,7 @@ def test_huge_target_parses_fast():
     t = time.perf_counter()
     e = parse_nginx_log_line(_line("GET /" + "a" * 100_000 + "?q=" + "/" * 100_000 + " HTTP/1.1"))
     assert time.perf_counter() - t < 1
-    assert len(e.endpoint) == 100_001 and len(e.query) == 100_000
+    assert len(e.endpoint) == 100_001 and len(e.query) == 100_002
 
 
 def test_escaped_sequences_stay_literal():

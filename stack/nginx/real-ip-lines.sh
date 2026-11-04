@@ -4,6 +4,13 @@
 set -f
 TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
 
+case "$TRUSTED_PROXY_CIDRS" in
+    ,*|*,|*,,*)
+        echo "invalid TRUSTED_PROXY_CIDRS: empty entry" >&2
+        exit 1
+        ;;
+esac
+
 IFS=','
 for cidr in $TRUSTED_PROXY_CIDRS; do
     case "$cidr" in
@@ -11,7 +18,7 @@ for cidr in $TRUSTED_PROXY_CIDRS; do
             echo "invalid TRUSTED_PROXY_CIDRS entry: $cidr" >&2
             exit 1
             ;;
-        */0)
+        */0*)
             echo "refusing default route as a trusted proxy: $cidr" >&2
             exit 1
             ;;

@@ -1,4 +1,4 @@
-def handler(request, xff, forwarded_ips, other, raw_forwarded):
+def handler(request, xff, forwarded_ips, x_forwarded_for, other, raw_forwarded):
     # ruleid: no-leftmost-forwarded-for
     a = request.headers.get("x-forwarded-for")
     # ruleid: no-leftmost-forwarded-for
@@ -13,6 +13,12 @@ def handler(request, xff, forwarded_ips, other, raw_forwarded):
     f = forwarded_ips[0]
     # ruleid: no-leftmost-forwarded-for
     g = xff[0]
+    # ruleid: no-leftmost-forwarded-for
+    l = xff.split(", ")[0]
+    # ruleid: no-leftmost-forwarded-for
+    m = x_forwarded_for[0]
+    # ruleid: no-leftmost-forwarded-for
+    n = request.headers.getlist("X-Forwarded-For")
     # ok: no-leftmost-forwarded-for
     h = request.client.host
     # ok: no-leftmost-forwarded-for

@@ -5,7 +5,9 @@ rules:
     message: The client IP comes from request.client, which uvicorn resolves from FORWARDED_ALLOW_IPS. Never read X-Forwarded-For or take its leftmost value, because the client controls it (invariant 5).
     pattern-either:
       - patterns:
-          - pattern: $REQ.headers.get($H, ...)
+          - pattern-either:
+              - pattern: $REQ.headers.get($H, ...)
+              - pattern: $REQ.headers.getlist($H)
           - metavariable-regex:
               metavariable: $H
               regex: (?i)^["']x-forwarded-for["']$
@@ -15,7 +17,7 @@ rules:
               metavariable: $H
               regex: (?i)^["']x-forwarded-for["']$
       - patterns:
-          - pattern: $X.split(",")[0]
+          - pattern: $X.split(...)[0]
           - metavariable-regex:
               metavariable: $X
               regex: (?i).*(xff|forwarded).*
@@ -23,4 +25,4 @@ rules:
           - pattern: $NAME[0]
           - metavariable-regex:
               metavariable: $NAME
-              regex: (?i)^(forwarded_ips|xff)$
+              regex: (?i).*(forwarded|xff).*

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ipaddress
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -41,7 +43,7 @@ def direct_client(api_client, fake_repository):
     main._ip_login_attempts.clear()
     fake_repository.get_user_by_username.return_value = None
     wrapped = ProxyHeadersMiddleware(api_client.app, trusted_hosts=NGINX)
-    return TestClient(wrapped, client=("198.51.100.7", 12345))
+    return TestClient(wrapped, client=("203.0.113.9", 12345))
 
 
 def test_proxy_chain_uses_rightmost_untrusted_ip(proxied_client, fake_repository):
@@ -57,7 +59,8 @@ def test_direct_peer_ignores_forwarded_header(direct_client, fake_repository):
     from src.api import main
 
     assert _login(direct_client).status_code == 401
-    assert fake_repository.log_audit_event.call_args.kwargs["source_ip"] == "198.51.100.7"
+    assert fake_repository.log_audit_event.call_args.kwargs["source_ip"] == "203.0.113.9"
+    assert "203.0.113.9" in main._ip_login_attempts
     assert "1.2.3.4" not in main._ip_login_attempts
 
 
@@ -84,6 +87,9 @@ def test_ingest_with_only_header_fields_is_422(api_client, monkeypatch):
         ("127.0.0.1,10.0.0.0/8", 0, "set_real_ip_from 127.0.0.1;\nset_real_ip_from 10.0.0.0/8;\n"),
         ("0.0.0.0/0", 1, ""),
         ("::/0", 1, ""),
+        ("0.0.0.0/00", 1, ""),
+        ("::/000", 1, ""),
+        ("10.0.0.1,,10.0.0.2", 1, ""),
         ("10.0.0.0/8;", 1, ""),
     ],
 )
@@ -99,15 +105,17 @@ def test_real_ip_lines_script(cidrs, code, out):
     assert result.stdout == out
 
 
-@pytest.mark.parametrize(
-    "compose, subnet, proxy_ip",
-    [
-        ("docker/docker-compose.yml", "172.28.10.0/24", "172.28.10.10"),
-        ("stack/docker-compose.yml", "172.28.20.0/24", "172.28.20.10"),
-    ],
-)
-def test_compose_ips_match(compose, subnet, proxy_ip):
-    text = (ROOT / compose).read_text(encoding="utf-8")
-    assert f"subnet: {subnet}" in text
-    assert f"ipv4_address: {proxy_ip}" in text
-    assert f"FORWARDED_ALLOW_IPS: {proxy_ip}" in text
+def _compose_value(text, key):
+    return re.search(rf"^\s*(?:-\s*)?{key}:\s*(\S+)", text, re.MULTILINE).group(1)
+
+
+def test_compose_ips_match():
+    text = (ROOT / "stack" / "docker-compose.yml").read_text(encoding="utf-8")
+    subnet = _compose_value(text, "subnet")
+    ipv4_address = _compose_value(text, "ipv4_address")
+    forwarded_allow_ips = _compose_value(text, "FORWARDED_ALLOW_IPS")
+    assert ipv4_address == forwarded_allow_ips
+    assert ipaddress.ip_address(ipv4_address) in ipaddress.ip_network(subnet)
+
+    docker_text = (ROOT / "docker" / "docker-compose.yml").read_text(encoding="utf-8")
+    assert "FORWARDED_ALLOW_IPS" not in docker_text

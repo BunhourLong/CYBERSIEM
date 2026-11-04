@@ -244,3 +244,88 @@ def test_single_medium_alert_reports_score_state(make_alert_row):
     assert evaluation.current_state == "unknown"
     assert evaluation.blocked_reason is None
     assert evaluation.reputation_reasons == ["score_state_unknown"]
+
+
+def test_alert_hold_clears_on_previous_blocked_record_when_only_low_unresolved_remains(make_alert_row):
+    previous = IPReputationRecord(ip=IP, current_state="blocked", blocked_reason="alert_hold", alert_hold_active=True)
+    rows = [
+        make_alert_row(id=1, type="payload_sqli", severity="high", status="safe"),
+        make_alert_row(id=2, type="user_agent_rotation", severity="low", status="unresolved"),
+    ]
+
+    evaluation = evaluate_ip_reputation(IP, rows, previous, now=NOW)
+
+    assert evaluation.blocked_reason != "alert_hold"
+    assert evaluation.alert_hold_active is False
+    assert "alert_hold" not in evaluation.reputation_reasons
+
+
+def test_future_block_timer_keeps_ip_blocked_after_alert_hold_clears(make_alert_row):
+    block_until = NOW + timedelta(seconds=3600)
+    previous = IPReputationRecord(
+        ip=IP,
+        current_state="blocked",
+        blocked_reason="alert_hold",
+        blocked_until=block_until,
+        alert_hold_active=True,
+    )
+    rows = [
+        make_alert_row(id=1, type="payload_sqli", severity="high", status="safe"),
+        make_alert_row(id=2, type="user_agent_rotation", severity="low", status="unresolved"),
+    ]
+
+    evaluation = evaluate_ip_reputation(IP, rows, previous, now=NOW)
+
+    assert evaluation.current_state == "blocked"
+    assert evaluation.blocked_reason == "block_window_active"
+    assert evaluation.blocked_until == block_until
+    assert evaluation.alert_hold_active is False
+    assert evaluation.reputation_reasons == ["block_window_active"]
+
+
+def test_safe_high_with_medium_unresolved_at_hold_weight_holds(make_alert_row):
+    rows = [
+        make_alert_row(id=1, type="payload_sqli", severity="high", status="safe"),
+        make_alert_row(id=2, type="payload_sqli", severity="medium", status="unresolved"),
+    ]
+
+    evaluation = evaluate_ip_reputation(IP, rows, now=NOW)
+
+    assert evaluation.current_state == "blocked"
+    assert evaluation.blocked_reason == "alert_hold"
+    assert evaluation.alert_hold_active is True
+
+
+def test_safe_high_with_malicious_low_below_hold_weight_does_not_hold(make_alert_row):
+    rows = [
+        make_alert_row(id=1, type="payload_sqli", severity="high", status="safe"),
+        make_alert_row(id=2, type="user_agent_rotation", severity="low", status="malicious"),
+    ]
+
+    evaluation = evaluate_ip_reputation(IP, rows, now=NOW)
+
+    assert evaluation.blocked_reason != "alert_hold"
+    assert evaluation.alert_hold_active is False
+    assert "alert_hold" not in evaluation.reputation_reasons
+
+
+def test_evaluation_does_not_depend_on_alert_row_order(make_alert_row):
+    active = make_alert_row(
+        id=1, type="payload_sqli", severity="high", status="unresolved", created_at=NOW - timedelta(seconds=60)
+    )
+    safe = make_alert_row(id=2, type="payload_sqli", severity="high", status="safe", created_at=NOW)
+
+    active_first = evaluate_ip_reputation(IP, [active, safe], now=NOW)
+    safe_first = evaluate_ip_reputation(IP, [safe, active], now=NOW)
+
+    assert active_first == safe_first
+
+
+def test_same_inputs_give_same_evaluation(make_alert_row):
+    rows = [make_alert_row(id=1, type="payload_sqli", severity="high", status="unresolved")]
+    previous = IPReputationRecord(ip=IP, current_state="blocked", blocked_reason="alert_hold")
+
+    first = evaluate_ip_reputation(IP, rows, previous, now=NOW)
+    second = evaluate_ip_reputation(IP, rows, previous, now=NOW)
+
+    assert first == second

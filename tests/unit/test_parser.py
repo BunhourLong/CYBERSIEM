@@ -116,3 +116,46 @@ def test_long_method_is_clipped_and_payload_kept_in_query():
     event = parse_nginx_log_line(_line("A" * 17 + " /p?q=<script> HTTP/1.1"))
     assert event.method == "A" * 16
     assert event.query == "q=<script>"
+
+
+@pytest.mark.parametrize(
+    ("target", "endpoint", "query"),
+    [
+        ("/a#b?c", "/a", ""),
+        ("/a?b#c", "/a", "b"),
+        ("?x=1", "/", "x=1"),
+        ("#x", "/", ""),
+        ("http://h.example/p//q?x=1&y=%22", "/p/q", "x=1&y=%22"),
+    ],
+)
+def test_target_forms_split_path_query_fragment(target, endpoint, query):
+    e = parse_nginx_log_line(_line(f"GET {target} HTTP/1.1"))
+    assert (e.endpoint, e.query, e.request_target) == (endpoint, query, target)
+
+
+@pytest.mark.parametrize("req", ["", "-"])
+def test_empty_request_keeps_status_and_ip(req):
+    e = parse_nginx_log_line(_line(req, status=400))
+    assert (e.method, e.endpoint, e.query, e.status_code, e.ip) == ("-", "/", "", 400, "172.17.0.1")
+
+
+def test_fallback_and_spaced_forms_keep_status_ip_and_query():
+    fb = parse_nginx_log_line(_line("GET /a b?x=1 HTTP/1.1", status=404))
+    assert (fb.method, fb.status_code, fb.ip, fb.query) == ("-", 404, "172.17.0.1", "")
+    sp = parse_nginx_log_line(_line("GET   /a?x=1   HTTP/1.1"))
+    assert (sp.method, sp.endpoint, sp.query) == ("GET", "/a", "x=1")
+
+
+def test_huge_target_parses_fast():
+    import time
+
+    t = time.perf_counter()
+    e = parse_nginx_log_line(_line("GET /" + "a" * 100_000 + "?q=" + "/" * 100_000 + " HTTP/1.1"))
+    assert time.perf_counter() - t < 1
+    assert len(e.endpoint) == 100_001 and len(e.query) == 100_000
+
+
+def test_escaped_sequences_stay_literal():
+    line = '1.1.1.1 - - [04/Nov/2026:00:59:25 +0000] "GET /a\\x22b?q=\\x22 HTTP/1.1" 200 1 "-" "ua\\x22x" "-" "-" "1.1.1.1"'
+    e = parse_nginx_log_line(line)
+    assert (e.endpoint, e.query, e.user_agent) == ("/a\\x22b", "q=\\x22", "ua\\x22x")

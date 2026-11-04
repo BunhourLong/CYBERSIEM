@@ -21,7 +21,7 @@ NGINX_EXTENDED_LOG_PATTERN = re.compile(
     r'"(?P<x_forwarded_for>[^"]*)" "(?P<x_real_ip>[^"]*)" "(?P<peer_ip>[^"]*)"$'
 )
 
-REQUEST_PATTERN = re.compile(r"^(?P<method>[A-Za-z_-]+) (?P<target>\S+)(?: HTTP/\S+)?$")
+REQUEST_PATTERN = re.compile(r"^(?P<method>[A-Za-z_-]+) +(?P<target>\S+)(?: +HTTP/\S+)? *$")
 
 TARGET_PATTERN = re.compile(r"(?:[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*)?(?P<path>[^?#]*)(?:\?(?P<query>[^#]*))?(?:#.*)?")
 SLASH_RUN = re.compile(r"/{2,}")
@@ -71,7 +71,9 @@ def _parse_request(request: str) -> tuple[str, str, str, str]:
     target = match.group("target")
     parts = TARGET_PATTERN.fullmatch(target)
     path = SLASH_RUN.sub("/", parts.group("path")) or "/"  # NGINX merge_slashes
-    return match.group("method"), target, path, parts.group("query") or ""
+    # upper: scrape checks compare to "GET"; clip: events.method is VARCHAR(16)
+    method = match.group("method").upper()[:16]
+    return method, target, path, parts.group("query") or ""
 
 
 def parse_nginx_log_line(line: str) -> HTTPLogEvent:

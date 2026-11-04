@@ -97,3 +97,22 @@ def test_bad_timestamp_raises_log_parse_error():
     line = '1.2.3.4 - - [99/Nov/2026:00:59:25 +0000] "GET / HTTP/1.1" 200 15 "-" "-"'
     with pytest.raises(LogParseError):
         parse_nginx_log_line(line)
+
+
+@pytest.mark.parametrize(
+    "req",
+    ["POST  /login HTTP/1.1", "POST /login  HTTP/1.1", "POST /login HTTP/1.1  "],
+)
+def test_repeated_spaces_parse(req):
+    event = parse_nginx_log_line(_line(req))
+    assert (event.method, event.endpoint) == ("POST", "/login")
+
+
+def test_method_is_uppercased():
+    assert parse_nginx_log_line(_line("get /x HTTP/1.1")).method == "GET"
+
+
+def test_long_method_is_clipped_and_payload_kept_in_query():
+    event = parse_nginx_log_line(_line("A" * 17 + " /p?q=<script> HTTP/1.1"))
+    assert event.method == "A" * 16
+    assert event.query == "q=<script>"

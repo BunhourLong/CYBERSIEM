@@ -12,12 +12,14 @@ from src.security_engine.parser import LogParseError, parse_nginx_log_line
 class LogMonitorService:
     IDLE_LOG_INTERVAL_SECONDS = 10.0
     MAX_LOG_LINE_PREVIEW_LENGTH = 200
+    MAX_CONSECUTIVE_FAILURES = 20
 
     def __init__(self, engine: SecurityEngine | None = None) -> None:
         self.engine = engine or SecurityEngine()
         self.engine.enforcement_service.initialize()
         self._last_idle_log_at = 0.0
         self.rejected_line_count = 0
+        self._consecutive_failures = 0
 
     def process_line(self, line: str):
         event = parse_nginx_log_line(line)
@@ -35,7 +37,7 @@ class LogMonitorService:
                 continue
 
             try:
-                with log_file.open("r", encoding="utf-8") as stream:
+                with log_file.open("r", encoding="utf-8", errors="replace") as stream:
                     self._log(f"Opened log file: {log_file}")
                     self._seek_to_end(stream)
                     self._reset_idle_log_timer()
@@ -57,7 +59,12 @@ class LogMonitorService:
                                     f"Failed to process log line: {type(exc).__name__} "
                                     f"(total={self.rejected_line_count})"
                                 )
+                                self._consecutive_failures += 1
+                                if self._consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
+                                    self._log("Too many consecutive processing failures, exiting")
+                                    raise
                                 continue
+                            self._consecutive_failures = 0
 
                             self._log(
                                 "Parsed event: "

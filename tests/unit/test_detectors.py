@@ -133,3 +133,44 @@ def test_brute_force_flags_five_failures():
     assert len(result) == 1
     assert result[0].alert_type == "brute_force"
     assert result[0].severity == "high"
+
+
+@pytest.mark.parametrize(
+    "target",
+    ["/s?q=a=once=1", "/s?filter=online=1", "/s?next=%2Fp%3Fq%3Done%3D1", "/s?q=a+only=1"],
+)
+def test_xss_ignores_on_word_after_equals(target):
+    assert XSSPayloadDetector().evaluate(_event(target)) == []
+
+
+def test_xss_ignores_on_word_in_user_agent():
+    assert XSSPayloadDetector().evaluate(_event("/", ua="Mozilla/5.0 (X; online=1)")) == []
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "/search?q=%22/onfocus=confirm(1)/autofocus/x=%22",
+        "/p?v='//onmouseover=prompt(1)//",
+    ],
+)
+def test_xss_flags_slash_breakout(target):
+    result = XSSPayloadDetector().evaluate(_event(target))
+
+    assert len(result) == 1
+    assert result[0].alert_type == "xss_payload"
+
+
+@pytest.mark.parametrize(
+    "target",
+    ["/blog/my-post--", "/files?include=src/**/"],
+)
+def test_sqli_ignores_ordinary_trailing_dashes(target):
+    assert PayloadDetector().evaluate(_event(target)) == []
+
+
+def test_sqli_flags_quoted_terminator():
+    result = PayloadDetector().evaluate(_event("/login?user=admin'--"))
+
+    assert len(result) == 1
+    assert result[0].alert_type == "payload_sqli"

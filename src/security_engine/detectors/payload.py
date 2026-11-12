@@ -13,7 +13,7 @@ SQLI_PATTERNS = [
     re.compile(r"(?i)\binformation_schema\b"),
 ]
 
-SQL_TERMINATOR = re.compile(r"(--|/\*|\*/)\s*$")
+SQL_TERMINATOR = re.compile(r"([\"')\d;])\s*(--|/\*|\*/)\s*$")
 
 
 class PayloadDetector(Detector):

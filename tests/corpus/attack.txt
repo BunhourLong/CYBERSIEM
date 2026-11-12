@@ -104,6 +104,9 @@ path_probe 198.51.100.82 - - [01/Jan/2026:10:20:19 +0000] "GET  /.env  HTTP/1.1"
 
 xss_payload 203.0.113.93 - - [01/Jan/2026:10:30:00 +0000] "GET /p?name=onerror%3Dconfirm(1) HTTP/1.1" 200 512 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 
+xss_payload 203.0.113.94 - - [01/Jan/2026:10:40:00 +0000] "GET /search?q=%22/onfocus=confirm(1)/autofocus/x=%22 HTTP/1.1" 200 512 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+payload_sqli 203.0.113.95 - - [01/Jan/2026:10:40:05 +0000] "GET /login?user=admin'-- HTTP/1.1" 200 512 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+
 # T-028 known misses: must stay listed, do not delete
 payload_sqli 203.0.113.91 - - [01/Jan/2026:11:00:00 +0000] "GET /products?id=1+UNION/**/SELECT+password+FROM+users HTTP/1.1" 200 512 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 xss_payload 203.0.113.92 - - [01/Jan/2026:11:00:05 +0000] "GET /search?q=%253Cscript%253Ealert%25281%252529%253C%252Fscript%253E HTTP/1.1" 200 512 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"

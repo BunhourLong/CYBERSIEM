@@ -132,7 +132,19 @@ def test_brute_force_flags_five_failures():
 
     assert len(result) == 1
     assert result[0].alert_type == "brute_force"
-    assert result[0].severity == "high"
+    assert result[0].severity == "medium"
+
+
+def test_brute_force_realerts_every_five_failures():
+    detector = BruteForceDetector()
+
+    alerting_attempts = []
+    for i in range(15):
+        alerts = detector.evaluate(_event("/login", method="POST", status=401, at=NOW + timedelta(seconds=3 * i)))
+        if alerts:
+            alerting_attempts.append(i + 1)
+
+    assert alerting_attempts == [5, 10, 15]
 
 
 @pytest.mark.parametrize(

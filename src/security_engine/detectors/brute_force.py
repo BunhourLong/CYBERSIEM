@@ -18,7 +18,7 @@ class BruteForceDetector(Detector):
         self.threshold = threshold
         self.window = timedelta(seconds=window_seconds)
         self._attempts_by_ip: dict[str, deque] = defaultdict(deque)
-        self._last_alert_at: dict[str, object] = {}
+        self._failures_since_alert: dict[str, int] = defaultdict(int)
 
     def evaluate(self, event: HTTPLogEvent) -> list[DetectionAlert]:
         if event.endpoint != self.login_path:
@@ -33,21 +33,23 @@ class BruteForceDetector(Detector):
         failed_attempts = [status for _, status in attempts if status in {401, 403}]
         repeated_attempts = len(attempts)
 
+        if event.status_code in {401, 403}:
+            self._failures_since_alert[event.ip] += 1
+
         if len(failed_attempts) < self.threshold:
             return []
 
-        last_alert_at = self._last_alert_at.get(event.ip)
-        if last_alert_at and event.timestamp - last_alert_at <= self.window:
+        if self._failures_since_alert[event.ip] < self.threshold:
             return []
 
-        self._last_alert_at[event.ip] = event.timestamp
+        self._failures_since_alert[event.ip] = 0
 
         return [
             DetectionAlert(
                 ip=event.ip,
                 endpoint=event.endpoint,
                 alert_type="brute_force",
-                severity="high",
+                severity="medium",
                 timestamp=event.timestamp,
                 message=f"{repeated_attempts} login attempts detected for {event.ip}",
                 metadata={

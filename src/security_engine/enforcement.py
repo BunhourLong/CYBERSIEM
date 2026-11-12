@@ -30,7 +30,7 @@ DEFAULT_STATE_THRESHOLDS = {
 }
 DEFAULT_ALERT_WEIGHTS = {
     "rate_abuse": 10.0,
-    "brute_force": 20.0,
+    "brute_force": 10.0,
     "payload_sqli": 35.0,
     "sqli_high_confidence": 35.0,
     "path_probe": 12.0,
@@ -482,6 +482,18 @@ def evaluate_ip_reputation(
     auto_block_eligible = has_direct_critical or has_repeated_medium or sustained_block_score
     force_block = has_direct_critical or has_repeated_medium
 
+    released_at = cooldown_until - timedelta(seconds=config.cooldown_duration_seconds) if cooldown_until else None
+    fresh_count = 0
+    if released_at is not None:
+        fresh_count = sum(
+            1
+            for a in recent_active_alerts
+            if a.created_at >= released_at
+            and now - a.created_at <= timedelta(seconds=config.repeated_medium_window_seconds)
+            and config.weight_for_alert(a.alert_type, a.severity) >= config.repeated_medium_min_weight
+        )
+    fresh_repeated_medium = released_at is not None and fresh_count >= config.repeated_medium_alert_count
+
     if whitelist or analyst_override == "trusted":
         current_state = "trusted"
         blocked_until = None
@@ -509,7 +521,15 @@ def evaluate_ip_reputation(
         current_state = "blocked"
         blocked_reason = previous_record.blocked_reason or "block_window_active"
         reasons.append("block_window_active")
-    elif cooldown_until and cooldown_until > now and auto_block_eligible and not has_direct_critical:
+    elif (
+        cooldown_until
+        and cooldown_until > now
+        and auto_block_eligible
+        and not has_direct_critical
+        and (analyst_override == "suppress_auto_block" or not fresh_repeated_medium)
+    ):
+        # Cooldown ignores alerts from before the release (including ones the block itself caused);
+        # fresh repeat offences after release still re-block.
         current_state = "throttled"
         blocked_reason = None
         reasons.append("cooldown_active")

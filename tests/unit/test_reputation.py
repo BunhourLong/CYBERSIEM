@@ -329,3 +329,111 @@ def test_same_inputs_give_same_evaluation(make_alert_row):
     second = evaluate_ip_reputation(IP, rows, previous, now=NOW)
 
     assert first == second
+
+
+def test_one_brute_force_alert_does_not_block(make_alert_row):
+    evaluation = evaluate_ip_reputation(IP, [make_alert_row(type="brute_force", severity="medium")], now=NOW)
+
+    assert evaluation.current_state != "blocked"
+    assert evaluation.blocked_reason is None
+    assert evaluation.alert_hold_active is False
+
+
+def test_three_brute_force_alerts_in_fifteen_minutes_block_with_expiry(make_alert_row):
+    rows = [
+        make_alert_row(id=1, type="brute_force", severity="medium", created_at=NOW - timedelta(seconds=600)),
+        make_alert_row(id=2, type="brute_force", severity="medium", created_at=NOW - timedelta(seconds=300)),
+        make_alert_row(id=3, type="brute_force", severity="medium", created_at=NOW),
+    ]
+
+    evaluation = evaluate_ip_reputation(IP, rows, now=NOW)
+
+    assert evaluation.current_state == "blocked"
+    assert evaluation.blocked_reason == "repeated_medium_alerts"
+    assert evaluation.blocked_until == NOW + timedelta(seconds=1800)
+    assert evaluation.alert_hold_active is False
+
+
+def test_brute_force_resumed_after_block_expiry_blocks_again(make_alert_row):
+    rows: list[dict] = []
+    prev = None
+
+    for index, offset in enumerate((0, 300, 600)):
+        rows.append(
+            make_alert_row(
+                id=index + 1,
+                type="brute_force",
+                severity="medium",
+                status="unresolved",
+                created_at=NOW + timedelta(seconds=offset),
+            )
+        )
+        prev = evaluate_ip_reputation(IP, rows, prev, now=NOW + timedelta(seconds=offset))
+
+    assert prev.current_state == "blocked"
+    assert prev.blocked_until == NOW + timedelta(seconds=2400)
+
+    prev = evaluate_ip_reputation(IP, rows, prev, now=NOW + timedelta(seconds=2500))
+    assert prev.current_state != "blocked"
+
+    for index, offset in enumerate((2500, 2800, 3100), start=3):
+        rows.append(
+            make_alert_row(
+                id=index + 1,
+                type="brute_force",
+                severity="medium",
+                status="unresolved",
+                created_at=NOW + timedelta(seconds=offset),
+            )
+        )
+        prev = evaluate_ip_reputation(IP, rows, prev, now=NOW + timedelta(seconds=offset))
+
+    assert prev.current_state == "blocked"
+
+
+def test_alerts_raised_during_block_do_not_extend_it(make_alert_row):
+    prev = IPReputationRecord(
+        ip=IP,
+        current_state="blocked",
+        blocked_until=NOW + timedelta(seconds=1800),
+        block_count=1,
+        blocked_reason="repeated_medium_alerts",
+    )
+    rows = [
+        make_alert_row(
+            id=index + 1,
+            type="brute_force",
+            severity="medium",
+            created_at=NOW + timedelta(seconds=offset),
+        )
+        for index, offset in enumerate((0, 300, 600, 1200, 1500, 1700))
+    ]
+
+    r1 = evaluate_ip_reputation(IP, rows, prev, now=NOW + timedelta(seconds=1800))
+    assert r1.current_state != "blocked"
+
+    r2 = evaluate_ip_reputation(IP, rows, r1, now=NOW + timedelta(seconds=1860))
+    assert r2.current_state != "blocked"
+
+
+def test_suppress_auto_block_still_holds_off_repeated_medium(make_alert_row):
+    previous = IPReputationRecord(
+        ip=IP,
+        analyst_override="suppress_auto_block",
+        cooldown_until=NOW + timedelta(seconds=1800),
+    )
+    rows = [
+        make_alert_row(
+            id=index + 1,
+            type="rate_abuse",
+            severity="medium",
+            status="unresolved",
+            created_at=NOW - timedelta(seconds=offset),
+        )
+        for index, offset in enumerate((600, 300, 0))
+    ]
+
+    evaluation = evaluate_ip_reputation(IP, rows, previous, now=NOW)
+
+    assert evaluation.current_state == "throttled"
+    assert "temporary_auto_block_suppression" in evaluation.reputation_reasons

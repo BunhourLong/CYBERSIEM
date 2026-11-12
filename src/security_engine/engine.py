@@ -1,16 +1,7 @@
 from __future__ import annotations
 
 from src.core.http_models import DetectionAlert, HTTPLogEvent
-from src.security_engine.detectors import (
-    BruteForceDetector,
-    CredentialStuffingDetector,
-    PathProbeDetector,
-    PayloadDetector,
-    RateAbuseDetector,
-    ScrapingDetector,
-    UserAgentRotationDetector,
-    XSSPayloadDetector,
-)
+from src.security_engine.detectors import build_detectors
 from src.security_engine.enforcement_service import EnforcementService
 from src.security_engine.repository import SecurityRepository
 
@@ -23,16 +14,7 @@ class SecurityEngine:
     ) -> None:
         self.repository = repository or SecurityRepository()
         self.enforcement_service = enforcement_service or EnforcementService(repository=self.repository)
-        self.detectors = [
-            RateAbuseDetector(),
-            BruteForceDetector(),
-            PayloadDetector(),
-            XSSPayloadDetector(),
-            PathProbeDetector(),
-            ScrapingDetector(),
-            CredentialStuffingDetector(),
-            UserAgentRotationDetector(),
-        ]
+        self.detectors = build_detectors()
 
     def process_event(self, event: HTTPLogEvent) -> list[DetectionAlert]:
         event_id = self.repository.insert_event(event)

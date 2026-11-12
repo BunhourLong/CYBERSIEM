@@ -11,8 +11,9 @@ SQLI_PATTERNS = [
     re.compile(r"(?i)\bor\b\s+1=1\b"),
     re.compile(r"(?i)\bdrop\s+table\b"),
     re.compile(r"(?i)\binformation_schema\b"),
-    re.compile(r"(?i)(--|/\*|\*/|;)\s*$"),
 ]
+
+SQL_TERMINATOR = re.compile(r"(--|/\*|\*/)\s*$")
 
 
 class PayloadDetector(Detector):
@@ -20,6 +21,8 @@ class PayloadDetector(Detector):
         normalized_target = unquote_plus(event.request_target)
         payload = f"{normalized_target} {event.user_agent}"
         matched_patterns = [pattern.pattern for pattern in SQLI_PATTERNS if pattern.search(payload)]
+        if SQL_TERMINATOR.search(normalized_target):
+            matched_patterns.append(SQL_TERMINATOR.pattern)
 
         if not matched_patterns:
             return []

@@ -17,6 +17,7 @@ tasks:
     cmds:
       - task: lint
       - task: test
+      - task: eval
       - task: frontend
 
   ship:
@@ -48,6 +49,11 @@ tasks:
     desc: 'Run the Python tests: task test -- tests/unit/test_x.py'
     cmds:
       - uv run --locked pytest {{.CLI_ARGS}}
+
+  eval:
+    desc: 'Replay the detection corpus and fail if a benign line would block'
+    cmds:
+      - uv run --locked python -m tests.eval_detection
 
   fmt:
     desc: Format Python and frontend code

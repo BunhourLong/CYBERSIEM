@@ -9,7 +9,8 @@ from src.security_engine.detectors.base import Detector
 XSS_PATTERNS = [
     re.compile(r"(?i)<script[\s>]"),
     re.compile(r"(?i)</script\s*>"),
-    re.compile(r"(?i)\bon\w+\s*="),
+    re.compile(r"(?i)<[a-z][^>]*[\s/\"']on[a-z]+\s*="),
+    re.compile(r"(?i)[\s\"'=]on[a-z]+\s*="),
     re.compile(r"(?i)javascript\s*:"),
     re.compile(r"(?i)<\s*iframe[\s>]"),
     re.compile(r"(?i)eval\s*\("),
@@ -17,7 +18,7 @@ XSS_PATTERNS = [
     re.compile(r"(?i)document\.cookie"),
     re.compile(r"(?i)document\.write\s*\("),
     re.compile(r"(?i)<\s*img[^>]+onerror\s*="),
-    re.compile(r"(?i)alert\s*\(\s*['\"]?[^)]{0,40}['\"]?\s*\)"),
+    re.compile(r"(?i)alert\s*\(\s*[^)\s][^)]{0,40}\)"),
 ]
 
 

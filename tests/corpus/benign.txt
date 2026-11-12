@@ -1,0 +1,78 @@
+# T-007 detection corpus: see tests/eval_detection.py for the format
+#
+# Ordinary traffic only. Every line is traffic a real shop sees on a quiet morning;
+# today's detectors still alert on some of it, and the eval is expected to exit 1.
+#
+# IP 192.0.2.21: desktop customer browsing the storefront
+192.0.2.21 - - [01/Jan/2026:09:00:00 +0000] "GET / HTTP/1.1" 200 5123 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.21 - - [01/Jan/2026:09:00:06 +0000] "GET /static/css/styles.css HTTP/1.1" 200 8402 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.21 - - [01/Jan/2026:09:00:11 +0000] "GET /static/js/app.js HTTP/1.1" 200 15310 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.21 - - [01/Jan/2026:09:00:18 +0000] "GET /static/img/banner.png HTTP/1.1" 200 48120 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.21 - - [01/Jan/2026:09:00:24 +0000] "GET /favicon.ico HTTP/1.1" 200 1543 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.21 - - [01/Jan/2026:09:00:40 +0000] "GET /products HTTP/1.1" 200 10234 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.21 - - [01/Jan/2026:09:00:47 +0000] "GET /products?page=2 HTTP/1.1" 200 10412 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.21 - - [01/Jan/2026:09:00:55 +0000] "GET /products/tea-kettle HTTP/1.1" 200 9115 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.21 - - [01/Jan/2026:09:01:03 +0000] "GET /cart HTTP/1.1" 200 6021 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+#
+# IP 198.51.100.22: iPad customer
+198.51.100.22 - - [01/Jan/2026:09:02:00 +0000] "GET / HTTP/1.1" 200 5123 "-" "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+198.51.100.22 - - [01/Jan/2026:09:02:08 +0000] "GET /robots.txt HTTP/1.1" 200 268 "-" "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+198.51.100.22 - - [01/Jan/2026:09:02:15 +0000] "GET /search?q=running+shoes HTTP/1.1" 200 9934 "-" "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+198.51.100.22 - - [01/Jan/2026:09:02:23 +0000] "GET /products/shoes/trail-runner HTTP/1.1" 200 9471 "-" "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+#
+# IP 203.0.113.23: the mobile app talking to the public API
+203.0.113.23 - - [01/Jan/2026:09:03:00 +0000] "GET /api/v1/catalog?category=shoes HTTP/1.1" 200 2240 "-" "ShopMobile/2.4 (iOS)"
+203.0.113.23 - - [01/Jan/2026:09:03:04 +0000] "GET /api/v1/events?filter=%7B%22level%22%3A%22info%22%7D HTTP/1.1" 200 1875 "-" "ShopMobile/2.4 (iOS)"
+#
+# Query strings that merely start with "on"
+192.0.2.31 - - [01/Jan/2026:09:05:00 +0000] "GET /products?online=1 HTTP/1.1" 200 10234 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.32 - - [01/Jan/2026:09:05:05 +0000] "GET /products?only=true HTTP/1.1" 200 10234 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+192.0.2.33 - - [01/Jan/2026:09:05:10 +0000] "GET /products?onsale=1 HTTP/1.1" 200 10234 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+192.0.2.34 - - [01/Jan/2026:09:05:15 +0000] "GET /products?once=1 HTTP/1.1" 200 10234 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
+192.0.2.35 - - [01/Jan/2026:09:05:20 +0000] "GET /search?q=how+to+use+alert()+in+javascript HTTP/1.1" 200 8742 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+198.51.100.36 - - [01/Jan/2026:09:05:25 +0000] "GET /help HTTP/1.1" 200 4311 "-" "Mozilla/5.0 (compatible; SiteAuditor/2.0);"
+#
+# IP 192.0.2.41: a customer hesitating on the login page, all successful
+192.0.2.41 - - [01/Jan/2026:09:10:00 +0000] "GET /login HTTP/1.1" 200 3210 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.41 - - [01/Jan/2026:09:10:30 +0000] "GET /login HTTP/1.1" 200 3210 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.41 - - [01/Jan/2026:09:11:00 +0000] "GET /login HTTP/1.1" 200 3210 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.41 - - [01/Jan/2026:09:11:30 +0000] "GET /login HTTP/1.1" 200 3210 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.41 - - [01/Jan/2026:09:12:00 +0000] "GET /login HTTP/1.1" 200 3210 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+#
+# IP 192.0.2.42: four typos then success, the classic human password dance
+192.0.2.42 - - [01/Jan/2026:09:13:00 +0000] "POST /login HTTP/1.1" 401 214 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.42 - - [01/Jan/2026:09:13:20 +0000] "POST /login HTTP/1.1" 401 214 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.42 - - [01/Jan/2026:09:13:40 +0000] "POST /login HTTP/1.1" 401 214 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.42 - - [01/Jan/2026:09:14:00 +0000] "POST /login HTTP/1.1" 401 214 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+192.0.2.42 - - [01/Jan/2026:09:14:20 +0000] "POST /login HTTP/1.1" 302 0 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+#
+# IP 203.0.113.51: desktop customer, Firefox
+203.0.113.51 - - [01/Jan/2026:09:20:00 +0000] "GET / HTTP/1.1" 200 5123 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+203.0.113.51 - - [01/Jan/2026:09:20:07 +0000] "GET /products/coffee-maker HTTP/1.1" 200 9311 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+203.0.113.51 - - [01/Jan/2026:09:20:14 +0000] "GET /products?page=3 HTTP/1.1" 200 10388 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+203.0.113.51 - - [01/Jan/2026:09:20:22 +0000] "GET /search?q=coffee+beans HTTP/1.1" 200 9764 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+203.0.113.51 - - [01/Jan/2026:09:20:29 +0000] "GET /static/img/product/coffee-maker.jpg HTTP/1.1" 200 36450 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+#
+# IP 198.51.100.52: another desktop customer
+198.51.100.52 - - [01/Jan/2026:09:25:00 +0000] "GET / HTTP/1.1" 200 5123 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:127.0) Gecko/20100101 Firefox/127.0"
+198.51.100.52 - - [01/Jan/2026:09:25:09 +0000] "GET /products HTTP/1.1" 200 10234 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:127.0) Gecko/20100101 Firefox/127.0"
+198.51.100.52 - - [01/Jan/2026:09:25:17 +0000] "GET /products/backpack HTTP/1.1" 200 9405 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:127.0) Gecko/20100101 Firefox/127.0"
+198.51.100.52 - - [01/Jan/2026:09:25:26 +0000] "GET /cart HTTP/1.1" 200 6021 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:127.0) Gecko/20100101 Firefox/127.0"
+198.51.100.52 - - [01/Jan/2026:09:25:34 +0000] "GET /checkout HTTP/1.1" 200 7210 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:127.0) Gecko/20100101 Firefox/127.0"
+#
+# IP 203.0.113.55: the Android app syncing cart and preferences
+203.0.113.55 - - [01/Jan/2026:09:26:00 +0000] "GET /api/v1/cart?user_id=17 HTTP/1.1" 200 1390 "-" "ShopMobile/2.4 (Android)"
+203.0.113.55 - - [01/Jan/2026:09:26:05 +0000] "GET /api/v1/preferences?settings=%7B%22currency%22%3A%22EUR%22%7D HTTP/1.1" 200 812 "-" "ShopMobile/2.4 (Android)"
+#
+# IP 192.0.2.53: reading the blog
+192.0.2.53 - - [01/Jan/2026:09:30:00 +0000] "GET /blog HTTP/1.1" 200 8842 "-" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+192.0.2.53 - - [01/Jan/2026:09:30:11 +0000] "GET /blog/brew-guides HTTP/1.1" 200 7955 "-" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+192.0.2.53 - - [01/Jan/2026:09:30:19 +0000] "GET /about HTTP/1.1" 200 5210 "-" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+192.0.2.53 - - [01/Jan/2026:09:30:27 +0000] "GET /contact HTTP/1.1" 200 4933 "-" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+192.0.2.53 - - [01/Jan/2026:09:30:35 +0000] "GET /favicon.ico HTTP/1.1" 200 1543 "-" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+#
+# IP 203.0.113.54: gift hunting
+203.0.113.54 - - [01/Jan/2026:09:35:00 +0000] "GET /search?q=gift+ideas HTTP/1.1" 200 9812 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+203.0.113.54 - - [01/Jan/2026:09:35:08 +0000] "GET /search?q=how+to+descale+a+kettle HTTP/1.1" 200 9027 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+203.0.113.54 - - [01/Jan/2026:09:35:15 +0000] "GET /products/kitchen HTTP/1.1" 200 10112 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+192.0.2.60 - - [01/Jan/2026:09:40:00 +0000] "GET /search?q=coffee; HTTP/1.1" 200 9610 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"

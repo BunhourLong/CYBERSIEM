@@ -33,7 +33,7 @@ class BruteForceDetector(Detector):
         failed_attempts = [status for _, status in attempts if status in {401, 403}]
         repeated_attempts = len(attempts)
 
-        if repeated_attempts < self.threshold:
+        if len(failed_attempts) < self.threshold:
             return []
 
         last_alert_at = self._last_alert_at.get(event.ip)
@@ -41,14 +41,13 @@ class BruteForceDetector(Detector):
             return []
 
         self._last_alert_at[event.ip] = event.timestamp
-        severity = "high" if len(failed_attempts) >= self.threshold else "medium"
 
         return [
             DetectionAlert(
                 ip=event.ip,
                 endpoint=event.endpoint,
                 alert_type="brute_force",
-                severity=severity,
+                severity="high",
                 timestamp=event.timestamp,
                 message=f"{repeated_attempts} login attempts detected for {event.ip}",
                 metadata={
